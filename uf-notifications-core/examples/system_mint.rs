@@ -63,7 +63,7 @@ async fn main() {
         now,
     )
     .expect("user");
-    User::upsert_used("example-user", user, &system, valence::use_!("upsert User in uf-notifications-core/examples/system_mint.rs; Valence persistence for this feature path; typed store; visible to test harness."))
+    User::upsert_used("example-user", user, &system, valence::use_!(r#"When **notifications** needs to persist work, we **save User** so the next step in that feature can continue with the latest values. People and services allowed for **notifications** use this data for that workflow—not as a general export of unrelated personal fields."#))
         .await
         .expect("seed user");
 

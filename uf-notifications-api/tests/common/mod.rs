@@ -63,7 +63,7 @@ pub async fn seed_user(id: &str, valence: &Valence) {
         now,
     )
     .expect("build user");
-    User::upsert_used(id, user, valence, valence::use_!("upsert User in tests/common/mod.rs; Valence persistence for this feature path; typed store; visible to test harness.")).await.expect("upsert user");
+    User::upsert_used(id, user, valence, valence::use_!(r#"**Test:** Fixture **User** save for `common` so the suite can arrange and assert persistence behavior. CI and developers running the suite only."#)).await.expect("upsert user");
 }
 
 pub async fn setup_shared_db() -> Valence {
