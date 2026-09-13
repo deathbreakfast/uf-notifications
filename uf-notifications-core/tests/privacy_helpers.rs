@@ -63,7 +63,7 @@ pub async fn seed_user(id: &str, valence: &Valence) {
         now,
     )
     .expect("build user");
-    User::upsert(id, user, valence).await.expect("upsert user");
+    User::upsert_used(id, user, valence, valence::use_!("upsert User in uf-notifications-core/tests/privacy_helpers.rs; Valence persistence for this feature path; typed store; visible to test harness.")).await.expect("upsert user");
 }
 
 pub async fn setup_shared_db() -> Valence {

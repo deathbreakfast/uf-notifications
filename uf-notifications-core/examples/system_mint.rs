@@ -63,7 +63,7 @@ async fn main() {
         now,
     )
     .expect("user");
-    User::upsert("example-user", user, &system)
+    User::upsert_used("example-user", user, &system, valence::use_!("upsert User in uf-notifications-core/examples/system_mint.rs; Valence persistence for this feature path; typed store; visible to test harness."))
         .await
         .expect("seed user");
 

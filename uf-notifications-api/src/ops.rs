@@ -84,7 +84,7 @@ pub async fn list_for_user(
     user_id: RecordId,
 ) -> Result<Vec<NotificationDto>, NotificationOpsError> {
     async {
-        let notifications: Vec<NotificationModel> = NotificationModel::query(valence)
+        let notifications: Vec<NotificationModel> = NotificationModel::query_used(valence, valence::use_!("query NotificationModel in uf-notifications-api/src/ops.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
             .where_user(RecordPredicate::Equals(user_id))
             .order_by_created_at(SortDirection::Desc)
             .limit(50)
@@ -113,7 +113,7 @@ pub async fn unread_preview_for_user(
     user_id: RecordId,
 ) -> Result<Vec<NotificationDto>, NotificationOpsError> {
     async {
-        let notifications: Vec<NotificationModel> = NotificationModel::query(valence)
+        let notifications: Vec<NotificationModel> = NotificationModel::query_used(valence, valence::use_!("query NotificationModel in uf-notifications-api/src/ops.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
             .where_user(RecordPredicate::Equals(user_id))
             .where_read_at_is_none()
             .order_by_created_at(SortDirection::Desc)
@@ -147,7 +147,7 @@ pub async fn unread_page_for_user(
     let limit = clamp_notification_page_limit(limit);
 
     async {
-        let notifications: Vec<NotificationModel> = NotificationModel::query(valence)
+        let notifications: Vec<NotificationModel> = NotificationModel::query_used(valence, valence::use_!("query NotificationModel in uf-notifications-api/src/ops.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
             .where_user(RecordPredicate::Equals(user_id.clone()))
             .where_read_at_is_none()
             .order_by_created_at(SortDirection::Desc)
@@ -157,7 +157,7 @@ pub async fn unread_page_for_user(
             .map_err(store_err)?;
 
         let total_count: Option<u64> = if offset == 0 {
-            let all_unread: Vec<NotificationModel> = NotificationModel::query(valence)
+            let all_unread: Vec<NotificationModel> = NotificationModel::query_used(valence, valence::use_!("query NotificationModel in uf-notifications-api/src/ops.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
                 .where_user(RecordPredicate::Equals(user_id))
                 .where_read_at_is_none()
                 .limit(MAX_NOTIFICATION_COUNT_CAP)
@@ -192,7 +192,7 @@ pub async fn unread_count_for_user(
     user_id: RecordId,
 ) -> Result<usize, NotificationOpsError> {
     async {
-        let notifications: Vec<NotificationModel> = NotificationModel::query(valence)
+        let notifications: Vec<NotificationModel> = NotificationModel::query_used(valence, valence::use_!("query NotificationModel in uf-notifications-api/src/ops.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
             .where_user(RecordPredicate::Equals(user_id))
             .where_read_at_is_none()
             .limit(MAX_NOTIFICATION_COUNT_CAP)
@@ -227,7 +227,7 @@ pub async fn today_count_for_user(
         };
         let today_start = DateTime::<Utc>::from_naive_utc_and_offset(midnight, Utc);
 
-        let notifications: Vec<NotificationModel> = NotificationModel::query(valence)
+        let notifications: Vec<NotificationModel> = NotificationModel::query_used(valence, valence::use_!("query NotificationModel in uf-notifications-api/src/ops.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
             .where_user(RecordPredicate::Equals(user_id))
             .where_created_at(DateTimePredicate::After(today_start))
             .limit(MAX_NOTIFICATION_COUNT_CAP)
@@ -256,7 +256,7 @@ pub async fn notification_count_for_user(
     user_id: RecordId,
 ) -> Result<usize, NotificationOpsError> {
     async {
-        let notifications: Vec<NotificationModel> = NotificationModel::query(valence)
+        let notifications: Vec<NotificationModel> = NotificationModel::query_used(valence, valence::use_!("query NotificationModel in uf-notifications-api/src/ops.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
             .where_user(RecordPredicate::Equals(user_id))
             .limit(MAX_NOTIFICATION_COUNT_CAP)
             .await
@@ -297,7 +297,7 @@ pub async fn notifications_page_for_user(
 
     async {
         let base = {
-            let mut q = NotificationModel::query(valence)
+            let mut q = NotificationModel::query_used(valence, valence::use_!("query NotificationModel in uf-notifications-api/src/ops.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
                 .where_user(RecordPredicate::Equals(user_id.clone()));
             match read_filter {
                 NotificationReadFilter::Unread => q = q.where_read_at_is_none(),
@@ -367,7 +367,7 @@ pub async fn mark_all_read_for_user(
     user_id: RecordId,
 ) -> Result<u32, NotificationOpsError> {
     async {
-        let unread: Vec<NotificationModel> = NotificationModel::query(valence)
+        let unread: Vec<NotificationModel> = NotificationModel::query_used(valence, valence::use_!("query NotificationModel in uf-notifications-api/src/ops.rs; Valence persistence for this feature path; typed store; visible to session actor / service path."))
             .where_user(RecordPredicate::Equals(user_id))
             .where_read_at_is_none()
             .limit(MAX_NOTIFICATION_COUNT_CAP)
@@ -400,7 +400,7 @@ pub async fn mark_all_read_for_user(
                 );
                 continue;
             }
-            match notification.get_mutable(valence).set_read_at(now) {
+            match notification.get_mutable_used(valence, valence::use_!("get_mutable via ops.rs; mutable handle for in-place update; typed store; session/service path.")).set_read_at(now) {
                 Ok(mutable) => match mutable.commit().await {
                     Ok(_) => {
                         committed = committed.saturating_add(1);
@@ -454,11 +454,11 @@ pub async fn mark_read_for_user(
     async {
         let id_str = notification_id.to_string();
         let maybe_notification: Option<NotificationModel> =
-            optional_notification(NotificationModel::get(&id_str, valence).await)?;
+            optional_notification(NotificationModel::get_used(&id_str, valence, valence::use_!("get NotificationModel in uf-notifications-api/src/ops.rs; Valence persistence for this feature path; typed store; visible to session actor / service path.")).await)?;
 
         if let Some(notification) = maybe_notification {
             notification
-                .get_mutable(valence)
+                .get_mutable_used(valence, valence::use_!("get_mutable via ops.rs; mutable handle for in-place update; typed store; session/service path."))
                 .set_read_at(Utc::now())
                 .map_err(store_err)?
                 .commit()
@@ -490,11 +490,11 @@ pub async fn mark_unread_for_user(
     async {
         let id_str = notification_id.to_string();
         let maybe_notification: Option<NotificationModel> =
-            optional_notification(NotificationModel::get(&id_str, valence).await)?;
+            optional_notification(NotificationModel::get_used(&id_str, valence, valence::use_!("get NotificationModel in uf-notifications-api/src/ops.rs; Valence persistence for this feature path; typed store; visible to session actor / service path.")).await)?;
 
         if let Some(notification) = maybe_notification {
             notification
-                .get_mutable(valence)
+                .get_mutable_used(valence, valence::use_!("get_mutable via ops.rs; mutable handle for in-place update; typed store; session/service path."))
                 .clear_read_at()
                 .commit()
                 .await

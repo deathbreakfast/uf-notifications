@@ -149,7 +149,7 @@ pub async fn send_notification(
     dto.notification_id = notification_uuid;
 
     async {
-        if let Err(source) = Notification::upsert(&id, notification, valence).await {
+        if let Err(source) = Notification::upsert_used(&id, notification, valence, valence::use_!("upsert Notification in uf-notifications-core/src/send.rs; Valence persistence for this feature path; typed store; visible to session actor / service path.")).await {
             tracing::Span::current().record("outcome", "persist_err");
             tracing::error!(
                 operation = "send",

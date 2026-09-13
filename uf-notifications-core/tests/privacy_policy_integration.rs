@@ -38,7 +38,7 @@ async fn mint_row(system: &valence::Valence, owner: &str) -> String {
         Utc::now(),
     )
     .expect("construct notification");
-    Notification::upsert(&id, row, system)
+    Notification::upsert_used(&id, row, system, valence::use_!("upsert Notification in uf-notifications-core/tests/privacy_policy_integration.rs; Valence persistence for this feature path; typed store; visible to test harness."))
         .await
         .expect("system may create");
     id
@@ -68,31 +68,31 @@ async fn owner_read_update_happy_peer_denied_sad() {
 
     let id = mint_row(&system, TEST_USER_A).await;
 
-    let loaded = Notification::get(&id, &owner)
+    let loaded = Notification::get_used(&id, &owner, valence::use_!("get Notification in uf-notifications-core/tests/privacy_policy_integration.rs; Valence persistence for this feature path; typed store; visible to test harness."))
         .await
         .expect("owner get")
         .expect("owner must see own row");
     assert_eq!(loaded.title(), "Privacy probe");
 
     loaded
-        .get_mutable(&owner)
+        .get_mutable_used(&owner, valence::use_!("get_mutable via privacy_policy_integration.rs; mutable handle for in-place update; typed store; session/service path."))
         .set_read_at(Utc::now())
         .expect("owner set_read_at")
         .commit()
         .await
         .expect("owner update");
 
-    let peer_get = Notification::get(&id, &peer).await.ok().flatten();
+    let peer_get = Notification::get_used(&id, &peer, valence::use_!("get Notification in uf-notifications-core/tests/privacy_policy_integration.rs; Valence persistence for this feature path; typed store; visible to test harness.")).await.ok().flatten();
     assert!(
         peer_get.is_none(),
         "peer must not read another user's notification"
     );
 
-    let owner_again = Notification::get(&id, &owner)
+    let owner_again = Notification::get_used(&id, &owner, valence::use_!("get Notification in uf-notifications-core/tests/privacy_policy_integration.rs; Valence persistence for this feature path; typed store; visible to test harness."))
         .await
         .expect("owner re-get")
         .expect("row still present");
-    match owner_again.get_mutable(&peer).set_read_at(Utc::now()) {
+    match owner_again.get_mutable_used(&peer, valence::use_!("get_mutable via privacy_policy_integration.rs; mutable handle for in-place update; typed store; session/service path.")).set_read_at(Utc::now()) {
         Err(_) => {}
         Ok(mutable) => {
             assert!(
@@ -112,22 +112,22 @@ async fn peer_and_session_delete_deny_system_delete_happy() {
 
     let id = mint_row(&system, TEST_USER_A).await;
 
-    let peer_delete = Notification::delete(&id, &peer).await;
+    let peer_delete = Notification::delete_used(&id, &peer, valence::use_!("delete Notification in uf-notifications-core/tests/privacy_policy_integration.rs; Valence persistence for this feature path; typed store; visible to test harness.")).await;
     assert!(
         peer_delete.is_err(),
         "peer delete must fail under SYSTEM_ONLY, got {peer_delete:?}"
     );
 
-    let owner_delete = Notification::delete(&id, &owner).await;
+    let owner_delete = Notification::delete_used(&id, &owner, valence::use_!("delete Notification in uf-notifications-core/tests/privacy_policy_integration.rs; Valence persistence for this feature path; typed store; visible to test harness.")).await;
     assert!(
         owner_delete.is_err(),
         "owner delete must fail under SYSTEM_ONLY, got {owner_delete:?}"
     );
 
-    Notification::delete(&id, &system)
+    Notification::delete_used(&id, &system, valence::use_!("delete Notification in uf-notifications-core/tests/privacy_policy_integration.rs; Valence persistence for this feature path; typed store; visible to test harness."))
         .await
         .expect("system may delete");
 
-    let gone = Notification::get(&id, &system).await.ok().flatten();
+    let gone = Notification::get_used(&id, &system, valence::use_!("get Notification in uf-notifications-core/tests/privacy_policy_integration.rs; Valence persistence for this feature path; typed store; visible to test harness.")).await.ok().flatten();
     assert!(gone.is_none(), "system delete must hide or remove the row");
 }

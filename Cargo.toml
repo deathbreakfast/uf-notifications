@@ -100,8 +100,8 @@ leptos_axum = { version = "0.8", default-features = false }
 orbital-paging = { git = "https://github.com/unified-field-dev/orbital", branch = "main", default-features = false }
 
 # Platform — uf-dev git main (git-ship day-to-day)
-valence = { package = "uf-valence", git = "https://github.com/unified-field-dev/valence", branch = "main", default-features = false, features = ["mem", "sqlite"] }
-valence-codegen = { package = "uf-valence-codegen", git = "https://github.com/unified-field-dev/valence", branch = "main" }
+valence = { package = "uf-valence", git = "https://github.com/deathbreakfast/valence", branch = "feat/data-use-transparency", default-features = false, features = ["mem", "sqlite"] }
+valence-codegen = { package = "uf-valence-codegen", git = "https://github.com/deathbreakfast/valence", branch = "feat/data-use-transparency" }
 higgs = { git = "https://github.com/unified-field-dev/higgs", branch = "main", default-features = false }
 higgs-host = { git = "https://github.com/unified-field-dev/higgs", branch = "main", default-features = false }
 higgs-identity = { git = "https://github.com/unified-field-dev/higgs", branch = "main" }
@@ -134,18 +134,18 @@ wasm-bindgen = "=0.2.126"
 # Some kits still declare Valence/Photon via crates.io. Redirect onto the same
 # uf-dev git tips as [workspace.dependencies] so those types unify.
 [patch.crates-io]
-uf-valence = { git = "https://github.com/unified-field-dev/valence", branch = "main" }
-uf-valence-codegen = { git = "https://github.com/unified-field-dev/valence", branch = "main" }
-uf-valence-core = { git = "https://github.com/unified-field-dev/valence", branch = "main" }
-uf-valence-macros = { git = "https://github.com/unified-field-dev/valence", branch = "main" }
-uf-valence-telemetry = { git = "https://github.com/unified-field-dev/valence", branch = "main" }
-uf-valence-schema-dsl = { git = "https://github.com/unified-field-dev/valence", branch = "main" }
-uf-valence-backend-mem = { git = "https://github.com/unified-field-dev/valence", branch = "main" }
-uf-valence-backend-sqlite = { git = "https://github.com/unified-field-dev/valence", branch = "main" }
-uf-valence-backend-sql = { git = "https://github.com/unified-field-dev/valence", branch = "main" }
-uf-valence-backend-postgres = { git = "https://github.com/unified-field-dev/valence", branch = "main" }
-uf-valence-backend-hybrid = { git = "https://github.com/unified-field-dev/valence", branch = "main" }
-uf-valence-backend-indradb = { git = "https://github.com/unified-field-dev/valence", branch = "main" }
+uf-valence = { git = "https://github.com/deathbreakfast/valence", branch = "feat/data-use-transparency" }
+uf-valence-codegen = { git = "https://github.com/deathbreakfast/valence", branch = "feat/data-use-transparency" }
+uf-valence-core = { git = "https://github.com/deathbreakfast/valence", branch = "feat/data-use-transparency" }
+uf-valence-macros = { git = "https://github.com/deathbreakfast/valence", branch = "feat/data-use-transparency" }
+uf-valence-telemetry = { git = "https://github.com/deathbreakfast/valence", branch = "feat/data-use-transparency" }
+uf-valence-schema-dsl = { git = "https://github.com/deathbreakfast/valence", branch = "feat/data-use-transparency" }
+uf-valence-backend-mem = { git = "https://github.com/deathbreakfast/valence", branch = "feat/data-use-transparency" }
+uf-valence-backend-sqlite = { git = "https://github.com/deathbreakfast/valence", branch = "feat/data-use-transparency" }
+uf-valence-backend-sql = { git = "https://github.com/deathbreakfast/valence", branch = "feat/data-use-transparency" }
+uf-valence-backend-postgres = { git = "https://github.com/deathbreakfast/valence", branch = "feat/data-use-transparency" }
+uf-valence-backend-hybrid = { git = "https://github.com/deathbreakfast/valence", branch = "feat/data-use-transparency" }
+uf-valence-backend-indradb = { git = "https://github.com/deathbreakfast/valence", branch = "feat/data-use-transparency" }
 uf-photon = { git = "https://github.com/unified-field-dev/photon", branch = "main" }
 uf-photon-core = { git = "https://github.com/unified-field-dev/photon", branch = "main" }
 photon-runtime = { git = "https://github.com/unified-field-dev/photon", branch = "main" }
