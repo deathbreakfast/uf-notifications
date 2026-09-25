@@ -1,0 +1,52 @@
+[advisories]
+version = 2
+yanked = "warn"
+# Both transitive via leptos itself (either_of / leptos_macro); no safe
+# replacement without leptos dropping them upstream.
+ignore = [
+    { id = "RUSTSEC-2024-0436", reason = "paste unmaintained; transitive via leptos (either_of)" },
+    { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2 unmaintained; transitive via leptos_macro" },
+]
+
+[licenses]
+version = 2
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-3.0",
+    "Unicode-DFS-2016",
+    "Zlib",
+    "OpenSSL",
+    "CC0-1.0",
+    "MPL-2.0",
+    "0BSD",
+    "BSL-1.0",
+    "Unlicense",
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.8
+
+[licenses.private]
+ignore = true
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+highlight = "all"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-git = [
+    "https://github.com/unified-field-dev/higgs",
+    "https://github.com/unified-field-dev/lepton",
+    "https://github.com/unified-field-dev/orbital",
+    "https://github.com/unified-field-dev/photon",
+    "https://github.com/unified-field-dev/photon-leptos",
+    "https://github.com/unified-field-dev/quark",
+    "https://github.com/unified-field-dev/valence",
+]

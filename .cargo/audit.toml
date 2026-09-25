@@ -1,0 +1,4 @@
+[advisories]
+# Transitive via broker SDKs; no fixed upgrade available upstream (matches the
+# same ignore already used in higgs/deny.toml elsewhere in the fleet).
+ignore = ["RUSTSEC-2023-0071"]

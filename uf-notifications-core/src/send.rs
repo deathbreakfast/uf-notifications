@@ -149,7 +149,7 @@ pub async fn send_notification(
     dto.notification_id = notification_uuid;
 
     async {
-        if let Err(source) = Notification::upsert_used(&id, notification, valence, valence::use_!(r"When **notifications** needs to persist work, we **save Notification** so the next step in that feature can continue with the latest values. People and services allowed for **notifications** use this data for that workflow—not as a general export of unrelated personal fields.")).await {
+        if let Err(source) = Notification::upsert(&id, notification, valence, valence::use_!(r"When **notifications** needs to persist work, we **save Notification** so the next step in that feature can continue with the latest values. People and services allowed for **notifications** use this data for that workflow—not as a general export of unrelated personal fields.")).await {
             tracing::Span::current().record("outcome", "persist_err");
             tracing::error!(
                 operation = "send",
