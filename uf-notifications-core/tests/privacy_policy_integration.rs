@@ -45,7 +45,7 @@ async fn mint_row(system: &valence::Valence, owner: &str) -> String {
 }
 
 #[tokio::test]
-async fn system_and_session_mint_happy_path() {
+async fn system_mint_happy_session_mint_denied_sad() {
     let base = setup_shared_db().await;
     let system = as_system(&base);
     let owner = as_user(&base, TEST_USER_A);
@@ -54,9 +54,18 @@ async fn system_and_session_mint_happy_path() {
         .await
         .expect("system send_notification must persist");
 
-    send_notification(sample_send(TEST_USER_B), &owner)
-        .await
-        .expect("session Valence may mint under AUTHENTICATED create (product fanout)");
+    assert!(
+        send_notification(sample_send(TEST_USER_B), &owner)
+            .await
+            .is_err(),
+        "a session actor must not mint into another user's inbox"
+    );
+    assert!(
+        send_notification(sample_send(TEST_USER_A), &owner)
+            .await
+            .is_err(),
+        "create is System only, even for the recipient"
+    );
 }
 
 #[tokio::test]
