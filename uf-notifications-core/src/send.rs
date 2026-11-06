@@ -26,6 +26,10 @@ fn truncate_chars(input: String, max: usize) -> String {
 }
 
 /// Parameters for creating a notification via [`send_notification`].
+///
+/// The sender is never a field here: [`send_notification`] records the acting
+/// Valence's actor as `sender`. Build with a struct literal plus
+/// `..Default::default()` so fields added later keep callers compiling.
 pub struct SendNotification {
     /// The recipient user's Valence record id.
     pub user_id: valence::RecordId,
@@ -39,6 +43,36 @@ pub struct SendNotification {
     pub url: Option<String>,
     /// Optional structured payload (JSON-encoded) for clients that render richer content.
     pub data_json: Option<String>,
+    /// The record this notification is about, as `table:id` (e.g. `"team:t1"`).
+    ///
+    /// With a subject, a non-System sender must be able to read it and the
+    /// recipient must be in its audience (see
+    /// [`register_notification_audience`](crate::register_notification_audience)).
+    /// `None` is the legacy unscoped path, which phase B removes.
+    pub subject: Option<String>,
+}
+
+impl Default for SendNotification {
+    /// Empty notification addressed to `user:` (no id); set `user_id` before sending.
+    fn default() -> Self {
+        Self {
+            user_id: valence::RecordId::new("user", ""),
+            kind: String::new(),
+            title: String::new(),
+            message: String::new(),
+            url: None,
+            data_json: None,
+            subject: None,
+        }
+    }
+}
+
+/// The `sender` recorded for `actor`: its user (or service user) id; `None` for System.
+fn sender_for(actor: &valence::Actor) -> Option<valence::RecordId> {
+    actor
+        .user_id()
+        .or_else(|| actor.service_name())
+        .map(|id| valence::RecordId::new("user", id))
 }
 
 /// Failure while constructing or persisting a notification via [`send_notification`].
@@ -81,6 +115,11 @@ impl std::error::Error for SendNotificationError {
 
 /// Persist a notification to Valence and publish a real-time event via Photon.
 ///
+/// The row's `sender` is the actor on `valence`. When `params.subject` is set
+/// and the actor is not System, Valence allows the create only if that actor
+/// can read the subject and the recipient is in the subject's registered
+/// audience; otherwise [`SendNotificationError::Persist`] is returned.
+///
 /// Records info span `uf_notifications.send` with fields `operation` and
 /// `outcome` (`ok`, `persist_err`, or `publish_err`). Span fields omit
 /// recipient ids, titles, and message bodies.
@@ -111,6 +150,22 @@ impl std::error::Error for SendNotificationError {
 ///         message: "You moved up to #3.".into(),
 ///         url: Some("/high-scores".into()),
 ///         data_json: None,
+///         subject: None,
+///     },
+///     &valence,
+/// )
+/// .await?;
+///
+/// // Scoped send from a session actor: the actor must be able to read
+/// // `team:t1`, and alice must be in the audience registered for `team`.
+/// let _scoped = send_notification(
+///     SendNotification {
+///         user_id: RecordId::new("user", "alice"),
+///         kind: "team_invite".into(),
+///         title: "You were added to a team".into(),
+///         message: "Welcome aboard.".into(),
+///         subject: Some("team:t1".into()),
+///         ..Default::default()
 ///     },
 ///     &valence,
 /// )
@@ -142,6 +197,8 @@ pub async fn send_notification(
         data_json,
         None,
         Utc::now(),
+        sender_for(valence.actor()),
+        params.subject,
     )
     .map_err(SendNotificationError::Construct)?;
 

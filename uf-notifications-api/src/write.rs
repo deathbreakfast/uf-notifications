@@ -92,7 +92,7 @@ pub async fn mark_notification_unread(
 ///
 /// Gated behind the `dev-tools` feature so production SSR builds do not expose
 /// an arbitrary notification-create endpoint. Valence create allows System and
-/// authenticated actors (product fanout); this helper mints a row for the
+/// scoped session sends (see `SECURITY.md`); this unscoped helper mints a row for the
 /// **authenticated session user** via [`crate::send_notification`] (same persist
 /// + Photon publish path as backend callers).
 ///
@@ -126,6 +126,7 @@ pub async fn create_test_notification(
             message,
             url,
             data_json: None,
+            subject: None,
         },
         &v,
     )

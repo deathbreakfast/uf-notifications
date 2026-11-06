@@ -23,6 +23,7 @@ fn sample(user: &str, title: &str) -> SendNotification {
         message: format!("body for {title}"),
         url: Some("/notifications".into()),
         data_json: None,
+        subject: None,
     }
 }
 

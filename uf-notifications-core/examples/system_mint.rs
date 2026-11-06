@@ -75,6 +75,7 @@ async fn main() {
             message: "Created with Actor::System".into(),
             url: Some("/notifications".into()),
             data_json: None,
+            subject: None,
         },
         &system,
     )
