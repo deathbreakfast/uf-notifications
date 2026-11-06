@@ -32,14 +32,25 @@ fn feature_assignment<'a>(toml: &'a str, name: &str) -> &'a str {
 }
 
 #[test]
-fn notification_schema_create_system_or_auth_read_update_owner_happy_path() {
+fn notification_schema_create_system_or_scoped_read_update_owner_happy_path() {
     let schema = fs::read_to_string(
         workspace_root().join("uf-notifications-core/schemas/notification_valence_schema.rs"),
     )
     .expect("notification_valence_schema.rs");
     assert!(
-        schema.contains("create: { allow: [SYSTEM_ONLY, AUTHENTICATED] }"),
-        "create must allow System jobs and session product fanout (no mid-request elevate)"
+        schema.contains("create: { allow: [SYSTEM_ONLY, SCOPED_NOTIFICATION_CREATE] }"),
+        "create must allow System jobs and scoped session fanout (no mid-request elevate)"
+    );
+    assert!(
+        schema.contains(r#"version: "0.4.0""#),
+        "adding sender/subject bumps the schema version so boot sync picks it up"
+    );
+    for field in ["sender: {", "subject: {"] {
+        assert!(schema.contains(field), "schema missing `{field}`");
+    }
+    assert!(
+        schema.contains("on_delete: SetNull"),
+        "deleting a sender clears the reference, not the recipient's row"
     );
     assert!(
         schema.contains("read:   { allow: [OWNER_BY_USER_FIELD] }")
@@ -65,6 +76,10 @@ fn notification_schema_owner_create_drift_sad_path() {
     assert!(
         !schema.contains("create: { allow: [OWNER_BY_USER_FIELD] }"),
         "OWNER create would let any signed-in user spam notifications for themselves via session Valence"
+    );
+    assert!(
+        !schema.contains("create: { allow: [SYSTEM_ONLY, AUTHENTICATED] }"),
+        "AUTHENTICATED create lets any signed-in actor write into any inbox"
     );
 }
 
@@ -93,6 +108,8 @@ fn security_md_states_system_only_mint_happy_path() {
         "create_test_notification",
         "dev-tools",
         "OWNER_BY_USER_FIELD",
+        "SCOPED_NOTIFICATION_CREATE",
+        "register_notification_audience",
     ] {
         assert!(md.contains(needle), "SECURITY.md missing `{needle}`");
     }

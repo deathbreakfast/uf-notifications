@@ -1,12 +1,14 @@
 use valence::prelude::*;
-use valence::privacy_policies::common::{AUTHENTICATED, SYSTEM_ONLY};
+use valence::privacy_policies::common::SYSTEM_ONLY;
 use valence::privacy_policies::owner::OWNER_BY_USER_FIELD;
+
+use crate::create_policy::SCOPED_NOTIFICATION_CREATE;
 
 valence_schema! {
     Notification {
         repository: "https://github.com/unified-field-dev/uf-notifications",
         table: "notification",
-        version: "0.3.0",
+        version: "0.4.0",
         database: crate::embedded_surreal::DEFAULT_STORAGE,
         description: "User notification for inbox and bell",
 
@@ -14,10 +16,11 @@ valence_schema! {
 
         policies: {
             read:   { allow: [OWNER_BY_USER_FIELD] },
-            // SYSTEM_ONLY for jobs/seeds; AUTHENTICATED so product side effects
-            // (e.g. gauge request fanout) mint under the session actor without
-            // mid-request System elevate. No public session create server fn.
-            create: { allow: [SYSTEM_ONLY, AUTHENTICATED] },
+            // SYSTEM_ONLY for jobs/seeds. SCOPED_NOTIFICATION_CREATE lets product
+            // side effects mint under the session actor without System elevation:
+            // sender is the actor, the actor can read `subject`, and the recipient
+            // is in the subject's registered audience (see `create_policy`).
+            create: { allow: [SYSTEM_ONLY, SCOPED_NOTIFICATION_CREATE] },
             update: { allow: [OWNER_BY_USER_FIELD] },
             delete: { allow: [SYSTEM_ONLY] },
         },
@@ -59,6 +62,14 @@ valence_schema! {
             created_at: {
                 r#type: FieldType::Datetime,
                 required: true,
+            },
+            sender: {
+                r#type: FieldType::Record("user"),
+                required: false,
+            },
+            subject: {
+                r#type: FieldType::String,
+                required: false,
             }
         ],
 
@@ -66,6 +77,13 @@ valence_schema! {
             user: {
                 table: "user",
                 on_delete: Cascade,
+                model: "lepton_identity::generated::User",
+            },
+            // Deleting the sender clears the reference; the recipient keeps the row.
+            sender: {
+                table: "user",
+                required: false,
+                on_delete: SetNull,
                 model: "lepton_identity::generated::User",
             },
         ],

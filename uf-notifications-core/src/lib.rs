@@ -52,6 +52,7 @@
 //!         message: "You moved up to #3.".into(),
 //!         url: Some("/high-scores".into()),
 //!         data_json: None,
+//!         subject: None,
 //!     },
 //!     valence,
 //! )
@@ -60,6 +61,11 @@
 //! # Ok(())
 //! # }
 //! ```
+//!
+//! Set `subject: Some("table:id")` to send a scoped notification as the session actor:
+//! the actor must be able to read the subject, and the recipient must pass the
+//! audience check the host registered with [`register_notification_audience`]. The
+//! row's `sender` is always the acting Valence's actor.
 //!
 //! Photon publish failures after a successful upsert are logged and do not fail this
 //! call — the Valence row is already durable. Next: [live push](#live-push) for the
@@ -86,6 +92,8 @@
 //!     None,
 //!     None,
 //!     Utc::now(),
+//!     None,
+//!     None,
 //! )
 //! .expect("valid notification");
 //!
@@ -158,6 +166,8 @@
 //! runs a full in-memory walkthrough. Product hosts that mount `uf-notifications`
 //! call `send_notification` then exercise the bell and inbox.
 
+pub mod audience;
+pub mod create_policy;
 pub mod embedded_surreal;
 pub mod events;
 pub mod generated;
@@ -167,6 +177,8 @@ mod schemas;
 mod send;
 mod url;
 
+pub use audience::{register_notification_audience, NotificationAudienceCheck};
+pub use create_policy::{ScopedNotificationCreate, SCOPED_NOTIFICATION_CREATE};
 pub use dto::{notification_to_dto, NotificationDto};
 pub use generated::Notification;
 pub use send::{send_notification, SendNotification, SendNotificationError};
