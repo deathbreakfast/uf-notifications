@@ -11,7 +11,8 @@
 //!      check registered with [`crate::register_notification_audience`]. With
 //!      no check registered, only `recipient == actor` passes.
 //! - **Row without `subject`** (legacy, removed in phase B): allowed for any
-//!   authenticated actor, with a `warn` naming the kind.
+//!   authenticated actor, with a `warn` naming the kind. If `sender` is set it
+//!   must still name the actor.
 //!
 //! System actors are covered by `SYSTEM_ONLY` in the schema and pass here too.
 
@@ -61,11 +62,20 @@ impl PolicyEvaluator for ScopedNotificationCreate {
         };
 
         let kind = record.get("kind").and_then(|k| k.as_str()).unwrap_or("");
+        let sender = record
+            .get("sender")
+            .filter(|s| !s.is_null())
+            .map(record_ref_id);
         let Some(subject) = record
             .get("subject")
             .and_then(|s| s.as_str())
             .filter(|s| !s.is_empty())
         else {
+            // A sender, when present, must still be the actor so legacy rows
+            // can't name someone else as the sender.
+            if sender.is_some_and(|s| s.as_deref() != Some(actor_id)) {
+                return Ok(false);
+            }
             tracing::warn!(
                 operation = "create",
                 policy = "scoped_notification_create",
@@ -76,8 +86,7 @@ impl PolicyEvaluator for ScopedNotificationCreate {
         };
 
         // 1. The sender is the actor.
-        let sender = record.get("sender").and_then(record_ref_id);
-        if sender.as_deref() != Some(actor_id) {
+        if sender.flatten().as_deref() != Some(actor_id) {
             return Ok(false);
         }
 

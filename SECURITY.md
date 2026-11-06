@@ -53,9 +53,12 @@ project mishandles them in a security-relevant way.
 - **Audience checks** answer yes or no for one recipient. They run with the
   caller's Valence, must not elevate to System, and must never return or log
   the audience list. An error from a check denies the create. The registry is
-  process-wide; hosts fill it at boot.
+  process-wide; hosts fill it at boot. A later registration for the same table
+  and kind replaces the earlier one and logs a `warn`, so any crate in the host
+  can still swap another product's check until the registry moves into Valence.
 - **Known gap (phase A):** a row without a `subject` is still allowed for any
-  authenticated actor, with a `warn` log naming the kind, so existing senders
+  authenticated actor (a `sender`, if set, must still be the actor), with a
+  `warn` log naming the kind, so existing senders
   keep working while they move to scoped sends. Until phase B removes that path,
   any signed-in actor can still write an unscoped notification to any user's
   inbox.

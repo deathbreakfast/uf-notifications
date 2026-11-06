@@ -19,7 +19,7 @@
 //!
 //! The registry is process-wide. Hosts register checks once at boot, before
 //! serving requests; a later registration for the same key replaces the earlier
-//! one.
+//! one and logs a `warn`.
 
 use std::collections::HashMap;
 use std::sync::{Arc, OnceLock, RwLock};
@@ -49,7 +49,8 @@ fn registry() -> &'static RwLock<HashMap<RegistryKey, NotificationAudienceCheck>
 ///
 /// Pass `Some(kind)` to scope the check to one notification kind; `None`
 /// covers every kind for that table. A kind-specific check wins over the
-/// table-wide one. Call this at host boot.
+/// table-wide one. Call this at host boot. Registering the same key again
+/// replaces the earlier check and logs a `warn`.
 ///
 /// # Examples
 ///
@@ -77,7 +78,14 @@ where
     let mut map = registry()
         .write()
         .unwrap_or_else(std::sync::PoisonError::into_inner);
-    map.insert(key, Arc::new(check));
+    if map.insert(key, Arc::new(check)).is_some() {
+        tracing::warn!(
+            operation = "register_audience",
+            table,
+            kind = kind.unwrap_or("*"),
+            "notification audience check replaced an earlier registration"
+        );
+    }
 }
 
 /// The check for `(table, kind)`, falling back to the table-wide check.

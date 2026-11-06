@@ -298,3 +298,37 @@ async fn system_scoped_and_legacy_unscoped_create_happy_path() {
         .await
         .expect("legacy row without subject stays allowed in phase A");
 }
+
+#[tokio::test]
+async fn legacy_create_forged_sender_denied_sad() {
+    let base = setup_shared_db().await;
+    let actor = as_user(&base, TEST_USER_A);
+
+    let forged = Notification::new(
+        RecordId::new("user", TEST_USER_B),
+        "legacy-forged".into(),
+        "Forged".into(),
+        "body".into(),
+        None,
+        None,
+        None,
+        Utc::now(),
+        Some(RecordId::new("user", TEST_USER_B)),
+        None,
+    )
+    .expect("construct notification");
+    let result = Notification::upsert(&Uuid::new_v4().to_string(), forged, &actor, valence::use_!(r"**Test:** Fixture **Notification** save for `tests` so the suite can arrange and assert persistence behavior. CI and developers running the suite only.")).await;
+    assert!(
+        result.is_err(),
+        "legacy row naming another user as sender must be denied, got {result:?}"
+    );
+
+    let dto = send_notification(sample_send(TEST_USER_B), &actor)
+        .await
+        .expect("legacy send from the actor still records the actor as sender");
+    let row = Notification::get(&dto.notification_id.to_string(), &as_system(&base), valence::use_!(r"**Test:** Fixture **Notification** load for `tests` so the suite can arrange and assert persistence behavior. CI and developers running the suite only."))
+        .await
+        .expect("system get")
+        .expect("row present");
+    assert_eq!(row.sender().map(|s| s.id()), Some(TEST_USER_A));
+}
