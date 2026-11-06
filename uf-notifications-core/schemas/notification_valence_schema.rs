@@ -1,12 +1,12 @@
 use valence::prelude::*;
-use valence::privacy_policies::common::SYSTEM_ONLY;
+use valence::privacy_policies::common::{AUTHENTICATED, SYSTEM_ONLY};
 use valence::privacy_policies::owner::OWNER_BY_USER_FIELD;
 
 valence_schema! {
     Notification {
         repository: "https://github.com/unified-field-dev/uf-notifications",
         table: "notification",
-        version: "0.2.0",
+        version: "0.3.0",
         database: crate::embedded_surreal::DEFAULT_STORAGE,
         description: "User notification for inbox and bell",
 
@@ -14,9 +14,10 @@ valence_schema! {
 
         policies: {
             read:   { allow: [OWNER_BY_USER_FIELD] },
-            // System only: a signed-in actor must not write into another user's
-            // inbox. Products mint from jobs (e.g. Boson tasks) that start as System.
-            create: { allow: [SYSTEM_ONLY] },
+            // SYSTEM_ONLY for jobs/seeds; AUTHENTICATED so product side effects
+            // (e.g. gauge request fanout) mint under the session actor without
+            // mid-request System elevate. No public session create server fn.
+            create: { allow: [SYSTEM_ONLY, AUTHENTICATED] },
             update: { allow: [OWNER_BY_USER_FIELD] },
             delete: { allow: [SYSTEM_ONLY] },
         },

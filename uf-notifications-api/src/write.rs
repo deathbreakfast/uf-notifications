@@ -91,12 +91,10 @@ pub async fn mark_notification_unread(
 /// Helper server function to create test notifications (development builds only).
 ///
 /// Gated behind the `dev-tools` feature so production SSR builds do not expose
-/// an arbitrary notification-create endpoint.
-///
-/// **Currently always fails.** Valence create is `SYSTEM_ONLY`, and this helper
-/// calls [`crate::send_notification`] with the session actor, so every call
-/// returns `"notification store failed"`. It stays in place until it is removed
-/// or moved to a System job; seed rows from a System job or test fixture instead.
+/// an arbitrary notification-create endpoint. Valence create allows System and
+/// authenticated actors (product fanout); this helper mints a row for the
+/// **authenticated session user** via [`crate::send_notification`] (same persist
+/// + Photon publish path as backend callers).
 ///
 /// Enable `dev-tools` on both `uf-notifications-api` and `uf-notifications` if
 /// you call this from the UI `server` re-export module. Keep the feature off

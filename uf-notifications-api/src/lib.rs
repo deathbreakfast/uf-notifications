@@ -16,8 +16,8 @@
 //!   session user. [Get started](#mark-read)
 //! - **Session user id** — Parse Higgs `table:id` session values into table and id
 //!   parts for SSR auth helpers. [Get started](#session-user-id)
-//! - **Dev test mint** — `dev-tools` helper that no longer works: create is System
-//!   only. [Details](#dev-test-notification)
+//! - **Dev test mint** — Create a notification for the signed-in user in development
+//!   builds (`dev-tools` feature). [Get started](#dev-test-notification)
 //!
 //! # Getting started
 //!
@@ -37,8 +37,9 @@
 //! when you need search, read filters, or offset paging.
 //!
 //! Prerequisites: signed-in session (Higgs request context on the server) and `ssr`
-//! enabled on `uf-notifications-api`. Seed at least one row from a System job or test
-//! fixture (create is System only) before asserting list contents.
+//! enabled on `uf-notifications-api`. Seed at least one row (for example via
+//! [dev test notification](#dev-test-notification) with `dev-tools`) before asserting
+//! list contents.
 //!
 //! ```rust,ignore
 //! # async fn demo() -> Result<(), leptos::prelude::ServerFnError> {
@@ -204,10 +205,10 @@
 //!
 //! ## Dev test notification
 //!
-//! `create_test_notification` calls [`send_notification`] with the session actor.
-//! Notification create is `SYSTEM_ONLY`, so the call always fails with
-//! `"notification store failed"`; the example below shows the old flow and won't
-//! persist a row. Keep the `dev-tools` feature off in production dependency graphs.
+//! `create_test_notification` mints a row for the authenticated session user through
+//! the same [`send_notification`] persist and Photon publish path as backend callers.
+//! Enable the `dev-tools` feature on `uf-notifications-api` (and `uf-notifications` if
+//! you re-export from the UI crate); keep it off in production dependency graphs.
 //!
 //! Prerequisites: `ssr` + `dev-tools`, signed-in session.
 //!

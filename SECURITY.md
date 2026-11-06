@@ -38,10 +38,15 @@ project mishandles them in a security-relevant way.
 
 ## Inbox notes
 
-- **Create** is `SYSTEM_ONLY`. A signed-in user cannot write to any inbox,
-  their own included. Products send from jobs, such as Boson tasks, that start
-  as System; don't elevate to System in the middle of a request. There is no
-  production session create server function, and delete stays `SYSTEM_ONLY`.
+- **Create** allows Valence `SYSTEM_ONLY` (jobs/seeds) and `AUTHENTICATED`
+  (product side effects such as gauge request fanout under the session actor).
+  There is still no production session create server function; delete stays
+  `SYSTEM_ONLY`. Call `send_notification` from backend code with the request
+  actor when possible so hosts do not mid-request elevate to System.
+- **Known gap:** `AUTHENTICATED` create means any signed-in actor can write to
+  any user's inbox. A create policy scoped to the actor's own permissions (the
+  sender recorded as the actor, recipients limited by what the actor can see)
+  will replace it.
 - **Read and mark-read/unread** are `OWNER_BY_USER_FIELD` plus a Higgs session
   on the `#[server]` paths. A guessed notification UUID must not leak another
   user's row.

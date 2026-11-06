@@ -32,18 +32,14 @@ fn feature_assignment<'a>(toml: &'a str, name: &str) -> &'a str {
 }
 
 #[test]
-fn notification_schema_create_system_only_read_update_owner_happy_path() {
+fn notification_schema_create_system_or_auth_read_update_owner_happy_path() {
     let schema = fs::read_to_string(
         workspace_root().join("uf-notifications-core/schemas/notification_valence_schema.rs"),
     )
     .expect("notification_valence_schema.rs");
     assert!(
-        schema.contains("create: { allow: [SYSTEM_ONLY] }"),
-        "create must be System only so no session actor can write another user's inbox"
-    );
-    assert!(
-        !schema.contains("AUTHENTICATED"),
-        "AUTHENTICATED must not appear in the Notification policies"
+        schema.contains("create: { allow: [SYSTEM_ONLY, AUTHENTICATED] }"),
+        "create must allow System jobs and session product fanout (no mid-request elevate)"
     );
     assert!(
         schema.contains("read:   { allow: [OWNER_BY_USER_FIELD] }")
