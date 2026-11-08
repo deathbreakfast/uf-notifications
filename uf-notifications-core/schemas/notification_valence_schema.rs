@@ -8,7 +8,7 @@ valence_schema! {
     Notification {
         repository: "https://github.com/unified-field-dev/uf-notifications",
         table: "notification",
-        version: "0.4.0",
+        version: "0.5.0",
         database: crate::embedded_surreal::DEFAULT_STORAGE,
         description: "User notification for inbox and bell",
 
@@ -20,6 +20,9 @@ valence_schema! {
             // side effects mint under the session actor without System elevation:
             // sender is the actor, the actor can read `subject`, and the recipient
             // is in the subject's registered audience (see `create_policy`).
+            // Without a subject, only a note to yourself passes. `sender` stays
+            // optional in the schema (System rows have none); the policy
+            // requires it for every non-System create.
             create: { allow: [SYSTEM_ONLY, SCOPED_NOTIFICATION_CREATE] },
             update: { allow: [OWNER_BY_USER_FIELD] },
             delete: { allow: [SYSTEM_ONLY] },
