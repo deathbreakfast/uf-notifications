@@ -86,9 +86,9 @@ async fn system_and_session_mint_happy_path() {
         .await
         .expect("system send_notification must persist");
 
-    send_notification(sample_send(TEST_USER_B), &owner)
+    send_notification(sample_send(TEST_USER_A), &owner)
         .await
-        .expect("session Valence may mint under AUTHENTICATED create (product fanout)");
+        .expect("session Valence may mint a note to itself");
 }
 
 #[tokio::test]
