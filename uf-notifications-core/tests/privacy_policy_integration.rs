@@ -279,10 +279,9 @@ async fn scoped_create_without_audience_check_only_self_sad_and_happy() {
 }
 
 #[tokio::test]
-async fn system_scoped_and_legacy_unscoped_create_happy_path() {
+async fn system_scoped_create_happy_path() {
     let base = setup_shared_db().await;
     let system = as_system(&base);
-    let peer = as_user(&base, TEST_USER_B);
     let subject = owned_subject(&system, TEST_USER_A).await;
 
     let dto = send_notification(scoped_send(TEST_USER_B, "scoped-system", &subject), &system)
@@ -293,10 +292,33 @@ async fn system_scoped_and_legacy_unscoped_create_happy_path() {
         .expect("system get")
         .expect("row present");
     assert!(row.sender().is_none(), "System sends record no sender");
+}
 
-    send_notification(sample_send(TEST_USER_A), &peer)
+#[tokio::test]
+async fn legacy_send_to_another_user_denied_sad() {
+    let base = setup_shared_db().await;
+    let actor = as_user(&base, TEST_USER_A);
+
+    let result = send_notification(sample_send(TEST_USER_B), &actor).await;
+    assert!(
+        result.is_err(),
+        "no-subject send to another user must be denied, got {result:?}"
+    );
+}
+
+#[tokio::test]
+async fn legacy_send_to_self_persists_happy() {
+    let base = setup_shared_db().await;
+    let actor = as_user(&base, TEST_USER_A);
+
+    let dto = send_notification(sample_send(TEST_USER_A), &actor)
         .await
-        .expect("legacy row without subject stays allowed in phase A");
+        .expect("a no-subject note to yourself is allowed");
+    let row = Notification::get(&dto.notification_id.to_string(), &as_system(&base), valence::use_!(r"**Test:** Fixture **Notification** load for `tests` so the suite can arrange and assert persistence behavior. CI and developers running the suite only."))
+        .await
+        .expect("system get")
+        .expect("row present");
+    assert_eq!(row.sender().map(|s| s.id()), Some(TEST_USER_A));
 }
 
 #[tokio::test]
@@ -323,7 +345,7 @@ async fn legacy_create_forged_sender_denied_sad() {
         "legacy row naming another user as sender must be denied, got {result:?}"
     );
 
-    let dto = send_notification(sample_send(TEST_USER_B), &actor)
+    let dto = send_notification(sample_send(TEST_USER_A), &actor)
         .await
         .expect("legacy send from the actor still records the actor as sender");
     let row = Notification::get(&dto.notification_id.to_string(), &as_system(&base), valence::use_!(r"**Test:** Fixture **Notification** load for `tests` so the suite can arrange and assert persistence behavior. CI and developers running the suite only."))

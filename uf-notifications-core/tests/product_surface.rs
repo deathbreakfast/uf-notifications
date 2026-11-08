@@ -42,7 +42,7 @@ fn notification_schema_create_system_or_scoped_read_update_owner_happy_path() {
         "create must allow System jobs and scoped session fanout (no mid-request elevate)"
     );
     assert!(
-        schema.contains(r#"version: "0.4.0""#),
+        schema.contains(r#"version: "0.5.0""#),
         "adding sender/subject bumps the schema version so boot sync picks it up"
     );
     for field in ["sender: {", "subject: {"] {

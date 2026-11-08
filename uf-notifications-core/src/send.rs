@@ -48,7 +48,7 @@ pub struct SendNotification {
     /// With a subject, a non-System sender must be able to read it and the
     /// recipient must be in its audience (see
     /// [`register_notification_audience`](crate::register_notification_audience)).
-    /// `None` is the legacy unscoped path, which phase B removes.
+    /// With `None`, a non-System sender can only notify itself.
     pub subject: Option<String>,
 }
 
