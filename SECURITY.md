@@ -41,12 +41,13 @@ project mishandles them in a security-relevant way.
 - **Create** allows Valence `SYSTEM_ONLY` (jobs, seeds) and
   `SCOPED_NOTIFICATION_CREATE`, which runs as the sending actor with no System
   elevation. `send_notification` records the acting Valence's actor as
-  `sender`; callers never pass one. For a row with a `subject` (`table:id`),
-  every check must pass:
-  1. `sender` names the actor. A service user passes only when the sender is
-     that service user.
-  2. The actor can read `subject` under its own privacy.
-  3. The recipient is in the subject's audience, answered by the check the host
+  `sender`; callers never pass one. Every non-System create needs `sender` to
+  name the actor (a service user passes only when the sender is that service
+  user). `sender` is optional in the schema because System rows have none, so
+  the policy enforces it. Then, for a row with a `subject` (`table:id`), both
+  checks must pass:
+  1. The actor can read `subject` under its own privacy.
+  2. The recipient is in the subject's audience, answered by the check the host
      registered with `register_notification_audience(table, kind, check)`. With
      no check registered for that table, only a notification to the actor
      itself is allowed; every other recipient is refused.
@@ -56,12 +57,9 @@ project mishandles them in a security-relevant way.
   process-wide; hosts fill it at boot. A later registration for the same table
   and kind replaces the earlier one and logs a `warn`, so any crate in the host
   can still swap another product's check until the registry moves into Valence.
-- **Known gap (phase A):** a row without a `subject` is still allowed for any
-  authenticated actor (a `sender`, if set, must still be the actor), with a
-  `warn` log naming the kind, so existing senders
-  keep working while they move to scoped sends. Until phase B removes that path,
-  any signed-in actor can still write an unscoped notification to any user's
-  inbox.
+- **No subject:** a non-System row without a `subject` is allowed only when
+  the recipient is the actor (a note to yourself). Any other recipient is
+  refused.
 - **System-started senders** such as Chronon scripts and Catalyst rule actions
   (`cx-notify-action`) still create as System. That is the job's own actor, not
   a mid-request elevation. Delete stays `SYSTEM_ONLY`, and there is still no

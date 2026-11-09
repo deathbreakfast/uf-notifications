@@ -3,16 +3,17 @@
 //! [`SCOPED_NOTIFICATION_CREATE`] lets a non-System actor create a notification
 //! under its own privacy, with no System elevation:
 //!
+//! Every non-System row must have `sender` set and naming the actor
+//! (`table:` prefix ignored). A service user passes only when the sender is
+//! that service user. Then:
+//!
 //! - **Row with `subject`** (all must hold):
-//!   1. `sender` is set and names the actor (`table:` prefix ignored). A
-//!      service user passes only when the sender is that service user.
-//!   2. The actor can read `subject` through its own [`Valence`].
-//!   3. The recipient (`user`) is in the subject's audience, answered by the
+//!   1. The actor can read `subject` through its own [`Valence`].
+//!   2. The recipient (`user`) is in the subject's audience, answered by the
 //!      check registered with [`crate::register_notification_audience`]. With
 //!      no check registered, only `recipient == actor` passes.
-//! - **Row without `subject`** (legacy, removed in phase B): allowed for any
-//!   authenticated actor, with a `warn` naming the kind. If `sender` is set it
-//!   must still name the actor.
+//! - **Row without `subject`**: allowed only when the recipient is the actor
+//!   (a note to yourself).
 //!
 //! System actors are covered by `SYSTEM_ONLY` in the schema and pass here too.
 
@@ -66,29 +67,22 @@ impl PolicyEvaluator for ScopedNotificationCreate {
             .get("sender")
             .filter(|s| !s.is_null())
             .map(record_ref_id);
+        // 1. The sender is the actor.
+        if sender.flatten().as_deref() != Some(actor_id) {
+            return Ok(false);
+        }
+
+        let Some(recipient) = record.get("user").and_then(record_ref_id) else {
+            return Ok(false);
+        };
         let Some(subject) = record
             .get("subject")
             .and_then(|s| s.as_str())
             .filter(|s| !s.is_empty())
         else {
-            // A sender, when present, must still be the actor so legacy rows
-            // can't name someone else as the sender.
-            if sender.is_some_and(|s| s.as_deref() != Some(actor_id)) {
-                return Ok(false);
-            }
-            tracing::warn!(
-                operation = "create",
-                policy = "scoped_notification_create",
-                kind,
-                "notification created without a subject (legacy path, removed in phase B)"
-            );
-            return Ok(true);
+            // No subject: only a note to yourself.
+            return Ok(recipient == actor_id);
         };
-
-        // 1. The sender is the actor.
-        if sender.flatten().as_deref() != Some(actor_id) {
-            return Ok(false);
-        }
 
         // 2. The actor can read the subject under its own privacy.
         if !actor_can_read_subject(subject, v).await? {
@@ -96,9 +90,6 @@ impl PolicyEvaluator for ScopedNotificationCreate {
         }
 
         // 3. The recipient is in the subject's audience.
-        let Some(recipient) = record.get("user").and_then(record_ref_id) else {
-            return Ok(false);
-        };
         let Some(table) = RecordId::parse(subject).map(|r| r.table().to_string()) else {
             return Ok(false);
         };

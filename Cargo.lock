@@ -1467,7 +1467,7 @@ dependencies = [
 [[package]]
 name = "lepton-identity"
 version = "0.1.0"
-source = "git+https://github.com/unified-field-dev/lepton?branch=main#63ef0a6fd9c33e6a7bbdb3d9f99da35b3ff163f0"
+source = "git+https://github.com/unified-field-dev/lepton?branch=main#87014fa637c36732fc7a578dbf7a01f78d964847"
 dependencies = [
  "anyhow",
  "argon2",
@@ -1477,6 +1477,7 @@ dependencies = [
  "rand_core 0.6.4",
  "serde",
  "serde_json",
+ "sha2",
  "tracing",
  "uf-valence",
  "uf-valence-codegen",
@@ -1965,7 +1966,7 @@ checksum = "8c04f5d74368e4d0dfe06c45c8627c81bd7c317d52762d118fb9b3076f6420fd"
 [[package]]
 name = "orbital-data"
 version = "0.1.4"
-source = "git+https://github.com/unified-field-dev/orbital?branch=main#3fc324e4602c995b7b3467fac36ce3ada8a15295"
+source = "git+https://github.com/unified-field-dev/orbital?branch=main#7d4702146822a28bd336f7ae7ac40b631611d320"
 dependencies = [
  "chrono",
  "serde",
@@ -1974,7 +1975,7 @@ dependencies = [
 [[package]]
 name = "orbital-paging"
 version = "0.1.4"
-source = "git+https://github.com/unified-field-dev/orbital?branch=main#3fc324e4602c995b7b3467fac36ce3ada8a15295"
+source = "git+https://github.com/unified-field-dev/orbital?branch=main#7d4702146822a28bd336f7ae7ac40b631611d320"
 dependencies = [
  "orbital-data",
  "serde",
@@ -3956,7 +3957,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.48.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
