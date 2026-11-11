@@ -6,6 +6,7 @@ yanked = "warn"
 ignore = [
     { id = "RUSTSEC-2024-0436", reason = "paste unmaintained; transitive via leptos (either_of)" },
     { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2 unmaintained; transitive via leptos_macro" },
+    { id = "RUSTSEC-2026-0459", reason = "libsqlite3-sys 0.30 via sqlx-sqlite; temporary until the fleet sqlx bump moves it to >=0.39" },
 ]
 
 [licenses]
