@@ -1,4 +1,9 @@
 [advisories]
 # Transitive via broker SDKs; no fixed upgrade available upstream (matches the
 # same ignore already used in higgs/deny.toml elsewhere in the fleet).
-ignore = ["RUSTSEC-2023-0071"]
+ignore = [
+    "RUSTSEC-2023-0071",
+    # libsqlite3-sys 0.30 via sqlx-sqlite; temporary until the fleet sqlx bump
+    # moves it to >=0.39.
+    "RUSTSEC-2026-0459",
+]
