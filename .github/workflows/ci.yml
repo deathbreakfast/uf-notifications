@@ -52,11 +52,6 @@ jobs:
           cargo clippy
           -p uf-notifications-api
           --features ssr --all-targets -- -D warnings
-      - name: cargo clippy (api, catalyst)
-        run: >
-          cargo clippy
-          -p uf-notifications-api
-          --features catalyst --all-targets -- -D warnings
 
   test:
     runs-on: ubuntu-latest
@@ -73,7 +68,6 @@ jobs:
         run: |
           cargo test -p uf-notifications-api
           cargo test -p uf-notifications-api --features ssr --lib
-          cargo test -p uf-notifications-api --features catalyst --lib --test catalyst_send
       - name: cargo check + run (notifications-mount-host)
         run: |
           cargo check -p notifications-mount-host

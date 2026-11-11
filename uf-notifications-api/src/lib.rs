@@ -246,15 +246,12 @@
 //! | Feature | Default | Purpose |
 //! |---------|---------|---------|
 //! | `ssr` | no | Valence-backed server functions, Photon synced unread count, core re-exports |
-//! | `catalyst` | no | Implies `ssr`; the `notifications.send` action for Catalyst rules (the `catalyst` module) |
 //! | `hydrate` | no | Client hydration markers; emits real [`subscribe_get_unread_count`] |
 //! | `dev-tools` | no | `create_test_notification` for local UI and e2e hosts |
 
 #![allow(missing_docs)]
 #![deny(clippy::missing_errors_doc)]
 
-#[cfg(feature = "catalyst")]
-pub mod catalyst;
 #[cfg(feature = "ssr")]
 mod ops;
 #[cfg(feature = "ssr")]

@@ -14,8 +14,6 @@ cargo test -p uf-notifications-core --test workspace_members --test product_surf
 cargo test -p uf-notifications-api
 cargo test -p uf-notifications-api --features ssr --lib
 cargo test -p uf-notifications-api --features ssr --test api_ops_integration
-# `notifications.send` Catalyst action (person, team, skipped recipients, Run as bot, simulate):
-cargo test -p uf-notifications-api --features catalyst --lib --test catalyst_send
 
 # Teaching host (Axum oneshot):
 cargo check -p notifications-mount-host
