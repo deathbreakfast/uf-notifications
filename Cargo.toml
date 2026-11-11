@@ -155,8 +155,3 @@ photon-macros = { git = "https://github.com/unified-field-dev/photon", branch = 
 uf-quark = { git = "https://github.com/unified-field-dev/quark", branch = "main" }
 orbital-paging = { git = "https://github.com/unified-field-dev/orbital", branch = "main" }
 orbital-data = { git = "https://github.com/unified-field-dev/orbital", branch = "main" }
-
-# gauge (via catalyst) depends on uf-notifications-core from git; unify it with
-# this workspace's copy so one Notification schema is linked.
-[patch."https://github.com/unified-field-dev/uf-notifications"]
-uf-notifications-core = { path = "uf-notifications-core" }
