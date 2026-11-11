@@ -34,11 +34,14 @@ photon-axum = { workspace = true, optional = true }
 axum = { workspace = true, optional = true, features = ["ws"] }
 futures = { version = "0.3", optional = true }
 tracing = { workspace = true, optional = true }
+catalyst = { git = "https://github.com/deathbreakfast/catalyst", branch = "main", default-features = false, features = ["db-sqlite"], optional = true }
 
 [features]
 default = []
 # Enables `create_test_notification` and other non-production helpers.
 dev-tools = []
+# `notifications.send` action for Catalyst rules (server side).
+catalyst = ["ssr", "dep:catalyst"]
 hydrate = ["leptos/hydrate", "dep:photon", "dep:photon-leptos", "photon-leptos/hydrate"]
 ssr = [
     "leptos/ssr",
@@ -70,3 +73,7 @@ uf-notifications-core = { workspace = true }
 [[test]]
 name = "api_ops_integration"
 required-features = ["ssr"]
+
+[[test]]
+name = "catalyst_send"
+required-features = ["catalyst"]
