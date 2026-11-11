@@ -26,7 +26,9 @@
 //! [`register_notification_audience`](uf_notifications_core::register_notification_audience).
 //! A recipient Valence refuses is skipped and counted: the outcome status is
 //! `partial` and the outputs carry `skipped`. Any other failure fails the
-//! action, so a storage fault is never reported as a skip.
+//! action with a `construct_failed` or `persist_failed` reason, so a storage
+//! fault is never reported as a skip. A failed action does not roll back the
+//! notifications already sent, so a retry notifies those recipients again.
 
 use std::future::Future;
 use std::pin::Pin;
@@ -169,11 +171,10 @@ impl<A: NotifyActor> ActionKind for NotifySend<A> {
     }
 
     fn output_schema(&self) -> ContextSchema {
-        ContextSchema::new(vec![ContextField::new(
-            "sent",
-            "People notified",
-            ContextType::Number,
-        )])
+        ContextSchema::new(vec![
+            ContextField::new("sent", "People notified", ContextType::Number),
+            ContextField::new("skipped", "People skipped", ContextType::Number),
+        ])
     }
 
     fn writes_visible(&self) -> bool {
@@ -216,7 +217,20 @@ impl<A: NotifyActor> ActionKind for NotifySend<A> {
                         source: valence::Error::Privacy(_),
                         ..
                     }) => skipped += 1,
-                    Err(_) => return Err(CatalystError::internal("notifications.send")),
+                    Err(err) => {
+                        let reason = match err {
+                            SendNotificationError::Construct(_) => "construct_failed",
+                            _ => "persist_failed",
+                        };
+                        tracing::warn!(
+                            operation = "notifications.send",
+                            reason,
+                            sent,
+                            skipped,
+                            "notification send failed; stopping the action"
+                        );
+                        return Err(invalid(reason));
+                    }
                 }
             }
             let status = if skipped == 0 { "ok" } else { "partial" };
@@ -300,6 +314,7 @@ mod tests {
         assert!(kind.writes_visible(), "Run as bot needs visible writes");
         assert!(!kind.requires_matching_backtest());
         assert!(kind.output_schema().field("sent").is_some());
+        assert!(kind.output_schema().field("skipped").is_some());
         let keys: Vec<_> = kind
             .param_schema()
             .fields()

@@ -23,6 +23,8 @@ use uuid::Uuid;
 use valence::{Actor, Model, RecordId, RecordPredicate, Valence};
 
 const BOT: &str = "svc:notify-bot";
+/// Recipient whose audience check errors, standing in for a storage fault.
+const BROKEN: &str = "notify-test-broken";
 const OUTSIDER: &str = "notify-test-outsider";
 
 /// Audience for catalyst notifications: users A and B only, whoever sends.
@@ -32,7 +34,13 @@ fn register_audience() {
     for table in ["notification", "user"] {
         register_notification_audience(table, Some("catalyst"), |_subject, recipient, _v| {
             let admitted = recipient == TEST_USER_A || recipient == TEST_USER_B;
-            Box::pin(async move { Ok(admitted) })
+            let broken = recipient == BROKEN;
+            Box::pin(async move {
+                if broken {
+                    return Err(valence::Error::Internal("audience store down".into()));
+                }
+                Ok(admitted)
+            })
         });
     }
 }
@@ -294,6 +302,22 @@ async fn actor_failure_fails_the_action_sad() {
 
     assert!(matches!(err, CatalystError::Internal { .. }));
     assert!(inbox(&f, TEST_USER_B).await.is_empty());
+}
+
+#[tokio::test]
+async fn non_privacy_send_failure_keeps_its_reason_sad() {
+    let f = fixture().await;
+    let subject = subject_owned_by(&as_system(&f.base), TEST_USER_A).await;
+    let params = json!({"to": [{"user": TEST_USER_B}, {"user": BROKEN}], "text": "Hi"});
+
+    let err = run(&f, &ExecContext::new(), &params, &subject)
+        .await
+        .expect_err("a non-privacy failure fails the action");
+
+    let CatalystError::KindFailed { reason, .. } = &err else {
+        panic!("expected KindFailed, got {err:?}");
+    };
+    assert_eq!(*reason, "persist_failed");
 }
 
 #[tokio::test]
