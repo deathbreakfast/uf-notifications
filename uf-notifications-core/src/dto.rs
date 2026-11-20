@@ -16,8 +16,13 @@ pub struct NotificationDto {
     /// Notification body text.
     pub message: String,
     /// Human-friendly relative time (e.g. `"5m ago"`), computed at read time by
-    /// [`notification_to_dto`] rather than stored.
+    /// [`notification_to_dto`] against the server clock. Kept for current clients;
+    /// new UI should render [`Self::created_at_rfc3339`] instead.
     pub created_at: String,
+    /// When the notification was created, as an RFC 3339 UTC string (for Orbital's
+    /// `Timestamp`). Empty when the payload came from a server that predates the field.
+    #[serde(default)]
+    pub created_at_rfc3339: String,
     /// Optional link the client should navigate to when the notification is clicked.
     pub url: Option<String>,
     /// Whether the recipient has marked this notification as read.
@@ -41,7 +46,8 @@ pub(crate) fn format_relative_time(dt: &DateTime<Utc>) -> String {
 }
 
 /// Convert a persisted [`Notification`] into the client-facing [`NotificationDto`], computing
-/// a human-friendly relative timestamp from `created_at`.
+/// a human-friendly relative timestamp from `created_at` and carrying the instant itself as
+/// RFC 3339.
 ///
 /// # Examples
 ///
@@ -87,6 +93,7 @@ pub fn notification_to_dto(n: &Notification) -> NotificationDto {
         title: n.title().clone(),
         message: n.message().clone(),
         created_at: format_relative_time(n.created_at()),
+        created_at_rfc3339: n.created_at().to_rfc3339(),
         url: sanitize_notification_url(n.url().cloned()),
         is_read: n.read_at().is_some(),
     }
@@ -133,6 +140,25 @@ mod tests {
         assert_eq!(dto.url.as_deref(), Some("/high-scores"));
         assert!(!dto.is_read);
         assert_eq!(dto.created_at, "12m ago");
+        assert_eq!(dto.created_at_rfc3339, created.to_rfc3339());
+        let parsed = DateTime::parse_from_rfc3339(&dto.created_at_rfc3339)
+            .expect("created_at_rfc3339 parses");
+        assert_eq!(parsed.with_timezone(&Utc), created);
+    }
+
+    #[test]
+    fn dto_without_created_at_rfc3339_deserializes() {
+        let json = r#"{
+            "notification_id": "00000000-0000-0000-0000-000000000000",
+            "title": "Title",
+            "message": "Message",
+            "created_at": "5m ago",
+            "url": null,
+            "is_read": false
+        }"#;
+        let dto: NotificationDto = serde_json::from_str(json).expect("older payload");
+        assert_eq!(dto.created_at, "5m ago");
+        assert_eq!(dto.created_at_rfc3339, "");
     }
 
     #[test]
