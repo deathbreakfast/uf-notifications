@@ -10,8 +10,10 @@
 //! - **Row with `subject`** (all must hold):
 //!   1. The actor can read `subject` through its own [`Valence`].
 //!   2. The recipient (`user`) is in the subject's audience, answered by the
-//!      check registered with [`crate::register_notification_audience`]. With
-//!      no check registered, only `recipient == actor` passes.
+//!      check in the [`crate::NotificationAudiences`] installed on the acting
+//!      Valence, or in the shared registry that
+//!      [`crate::register_notification_audience`] fills when none is installed.
+//!      With no check registered, only `recipient == actor` passes.
 //! - **Row without `subject`**: allowed only when the recipient is the actor
 //!   (a note to yourself).
 //!
@@ -93,7 +95,7 @@ impl PolicyEvaluator for ScopedNotificationCreate {
         let Some(table) = RecordId::parse(subject).map(|r| r.table().to_string()) else {
             return Ok(false);
         };
-        match lookup_audience_check(&table, kind) {
+        match lookup_audience_check(v, &table, kind) {
             Some(check) => check(subject, &recipient, v).await,
             None => Ok(recipient == actor_id),
         }

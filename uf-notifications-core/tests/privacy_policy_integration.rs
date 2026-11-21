@@ -9,9 +9,14 @@
 mod privacy_helpers;
 
 use chrono::Utc;
-use privacy_helpers::{as_system, as_user, setup_shared_db, TEST_USER_A, TEST_USER_B};
+use std::sync::Arc;
+
+use privacy_helpers::{
+    as_system, as_user, setup_shared_db, setup_shared_db_with, TEST_USER_A, TEST_USER_B,
+};
 use uf_notifications_core::{
-    register_notification_audience, send_notification, Notification, SendNotification,
+    register_notification_audience, send_notification, Notification, NotificationAudiences,
+    SendNotification,
 };
 use uuid::Uuid;
 use valence::{Model, RecordId};
@@ -40,14 +45,21 @@ fn scoped_send(recipient: &str, kind: &str, subject: &str) -> SendNotification {
     }
 }
 
-/// Register an audience for `notification` subjects of `kind` that admits only
-/// `member`, and only when the check runs as `expected_actor` (no elevation).
-fn register_single_member_audience(kind: &str, member: &'static str, expected_actor: &'static str) {
-    register_notification_audience("notification", Some(kind), move |_subject, recipient, v| {
+/// A registry with an audience for `notification` subjects of `kind` that
+/// admits only `member`, and only when the check runs as `expected_actor` (no
+/// elevation).
+fn single_member_audience(
+    kind: &str,
+    member: &'static str,
+    expected_actor: &'static str,
+) -> Arc<NotificationAudiences> {
+    let audiences = Arc::new(NotificationAudiences::new());
+    audiences.register("notification", Some(kind), move |_subject, recipient, v| {
         Box::pin(
             async move { Ok(v.actor().user_id() == Some(expected_actor) && recipient == member) },
         )
     });
+    audiences
 }
 
 /// Subject record owned by `owner`: only `owner` (and System) can read it.
@@ -166,12 +178,16 @@ async fn peer_and_session_delete_deny_system_delete_happy() {
 
 #[tokio::test]
 async fn scoped_create_happy_path_records_sender() {
-    let base = setup_shared_db().await;
+    let base = setup_shared_db_with(Some(single_member_audience(
+        "scoped-happy",
+        TEST_USER_B,
+        TEST_USER_A,
+    )))
+    .await;
     let system = as_system(&base);
     let sender = as_user(&base, TEST_USER_A);
     let recipient = as_user(&base, TEST_USER_B);
     let subject = owned_subject(&system, TEST_USER_A).await;
-    register_single_member_audience("scoped-happy", TEST_USER_B, TEST_USER_A);
 
     let dto = send_notification(scoped_send(TEST_USER_B, "scoped-happy", &subject), &sender)
         .await
@@ -187,11 +203,15 @@ async fn scoped_create_happy_path_records_sender() {
 
 #[tokio::test]
 async fn scoped_create_forged_sender_denied_sad() {
-    let base = setup_shared_db().await;
+    let base = setup_shared_db_with(Some(single_member_audience(
+        "scoped-forged",
+        TEST_USER_B,
+        TEST_USER_A,
+    )))
+    .await;
     let system = as_system(&base);
     let actor = as_user(&base, TEST_USER_A);
     let subject = owned_subject(&system, TEST_USER_A).await;
-    register_single_member_audience("scoped-forged", TEST_USER_B, TEST_USER_A);
 
     let forged = Notification::new(
         RecordId::new("user", TEST_USER_B),
@@ -215,12 +235,16 @@ async fn scoped_create_forged_sender_denied_sad() {
 
 #[tokio::test]
 async fn scoped_create_unreadable_subject_denied_sad() {
-    let base = setup_shared_db().await;
+    let base = setup_shared_db_with(Some(single_member_audience(
+        "scoped-unreadable",
+        TEST_USER_B,
+        TEST_USER_B,
+    )))
+    .await;
     let system = as_system(&base);
     let outsider = as_user(&base, TEST_USER_B);
     // Owned by A, so B cannot read it; the audience would admit B.
     let subject = owned_subject(&system, TEST_USER_A).await;
-    register_single_member_audience("scoped-unreadable", TEST_USER_B, TEST_USER_B);
 
     let result = send_notification(
         scoped_send(TEST_USER_B, "scoped-unreadable", &subject),
@@ -235,12 +259,16 @@ async fn scoped_create_unreadable_subject_denied_sad() {
 
 #[tokio::test]
 async fn scoped_create_recipient_outside_audience_denied_sad() {
-    let base = setup_shared_db().await;
+    // Audience admits only A, so B is outside it.
+    let base = setup_shared_db_with(Some(single_member_audience(
+        "scoped-outside",
+        TEST_USER_A,
+        TEST_USER_A,
+    )))
+    .await;
     let system = as_system(&base);
     let sender = as_user(&base, TEST_USER_A);
     let subject = owned_subject(&system, TEST_USER_A).await;
-    // Audience admits only A, so B is outside it.
-    register_single_member_audience("scoped-outside", TEST_USER_A, TEST_USER_A);
 
     let result = send_notification(
         scoped_send(TEST_USER_B, "scoped-outside", &subject),
@@ -255,7 +283,7 @@ async fn scoped_create_recipient_outside_audience_denied_sad() {
 
 #[tokio::test]
 async fn scoped_create_without_audience_check_only_self_sad_and_happy() {
-    let base = setup_shared_db().await;
+    let base = setup_shared_db_with(Some(Arc::new(NotificationAudiences::new()))).await;
     let system = as_system(&base);
     let sender = as_user(&base, TEST_USER_A);
     let subject = owned_subject(&system, TEST_USER_A).await;
@@ -276,6 +304,48 @@ async fn scoped_create_without_audience_check_only_self_sad_and_happy() {
     )
     .await
     .expect("no registered audience still allows recipient == actor");
+}
+
+#[tokio::test]
+async fn scoped_create_ignores_shared_check_when_host_installs_registry_sad() {
+    // The shared registry would admit B, but the host installed its own empty one.
+    register_notification_audience("notification", Some("scoped-shared-only"), |_, _, _| {
+        Box::pin(async { Ok(true) })
+    });
+    let base = setup_shared_db_with(Some(Arc::new(NotificationAudiences::new()))).await;
+    let system = as_system(&base);
+    let sender = as_user(&base, TEST_USER_A);
+    let subject = owned_subject(&system, TEST_USER_A).await;
+
+    let result = send_notification(
+        scoped_send(TEST_USER_B, "scoped-shared-only", &subject),
+        &sender,
+    )
+    .await;
+    assert!(
+        result.is_err(),
+        "a check only in the shared registry must not apply, got {result:?}"
+    );
+}
+
+#[tokio::test]
+async fn scoped_create_falls_back_to_shared_registry_happy_path() {
+    register_notification_audience(
+        "notification",
+        Some("scoped-shared-fallback"),
+        |_, recipient, _| Box::pin(async move { Ok(recipient == TEST_USER_B) }),
+    );
+    let base = setup_shared_db().await;
+    let system = as_system(&base);
+    let sender = as_user(&base, TEST_USER_A);
+    let subject = owned_subject(&system, TEST_USER_A).await;
+
+    send_notification(
+        scoped_send(TEST_USER_B, "scoped-shared-fallback", &subject),
+        &sender,
+    )
+    .await
+    .expect("with no installed registry, the shared one applies");
 }
 
 #[tokio::test]

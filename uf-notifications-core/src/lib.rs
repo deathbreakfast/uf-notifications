@@ -64,7 +64,8 @@
 //!
 //! Set `subject: Some("table:id")` to send a scoped notification as the session actor:
 //! the actor must be able to read the subject, and the recipient must pass the
-//! audience check the host registered with [`register_notification_audience`]. The
+//! audience check the host registered with [`register_notification_audience`] (or on
+//! the [`NotificationAudiences`] it installed on Valence). The
 //! row's `sender` is always the acting Valence's actor.
 //!
 //! Photon publish failures after a successful upsert are logged and do not fail this
@@ -177,7 +178,9 @@ mod schemas;
 mod send;
 mod url;
 
-pub use audience::{register_notification_audience, NotificationAudienceCheck};
+pub use audience::{
+    register_notification_audience, NotificationAudienceCheck, NotificationAudiences,
+};
 pub use create_policy::{ScopedNotificationCreate, SCOPED_NOTIFICATION_CREATE};
 pub use dto::{notification_to_dto, NotificationDto};
 pub use generated::Notification;
