@@ -41,8 +41,8 @@ use valence::{
 
 use crate::{
     cap_notification_count, clamp_notification_page_limit, notification_to_dto,
-    truncate_notification_search, NotificationDto, NotificationModel, NotificationReadFilter,
-    MAX_NOTIFICATION_COUNT_CAP,
+    truncate_notification_search, NotificationDto, NotificationInboxFilter, NotificationModel,
+    NotificationReadFilter, MAX_NOTIFICATION_COUNT_CAP,
 };
 
 /// Typed failure from Valence-backed notification ops (before the Leptos boundary).
@@ -474,6 +474,48 @@ pub async fn notifications_page_for_request(
     query: Option<String>,
     read_filter: NotificationReadFilter,
 ) -> Result<Page<NotificationDto>, NotificationOpsError> {
+    inbox_page_for_request(
+        valence,
+        user_id,
+        request,
+        query,
+        read_filter,
+        &NotificationInboxFilter::default(),
+    )
+    .await
+}
+
+/// Registered kind ids `filter` admits, or `None` when it admits every kind.
+fn inbox_kind_ids(filter: &NotificationInboxFilter) -> Option<Vec<&'static str>> {
+    filter.is_active().then(|| {
+        uf_notifications_core::kinds()
+            .into_iter()
+            .filter(|k| !filter.asks_action || k.asks_action)
+            .filter(|k| filter.app_id.as_deref().is_none_or(|app| k.app == app))
+            .map(|k| k.id)
+            .collect()
+    })
+}
+
+/// [`notifications_page_for_request`] narrowed by an inbox filter.
+///
+/// `filter.asks_action` keeps kinds that ask the reader to act and
+/// `filter.app_id` keeps one app's kinds, both from the kind registry, so
+/// unregistered kinds never match an active filter. A filter no registered
+/// kind matches returns an empty page. Cursors carry the filter, so one issued
+/// under another filter falls back to `offset`.
+///
+/// # Errors
+///
+/// Returns [`NotificationOpsError::Store`] on Valence errors.
+pub async fn inbox_page_for_request(
+    valence: &Valence,
+    user_id: RecordId,
+    request: &PageRequest,
+    query: Option<String>,
+    read_filter: NotificationReadFilter,
+    inbox_filter: &NotificationInboxFilter,
+) -> Result<Page<NotificationDto>, NotificationOpsError> {
     let limit = clamp_notification_page_limit(request.limit);
     let offset = request.offset;
     let filter = read_filter_label(read_filter);
@@ -482,9 +524,16 @@ pub async fn notifications_page_for_request(
         .map(truncate_notification_search)
         .filter(|s| !s.is_empty());
     let has_query = search_term.is_some();
-    let scope = cursor_scope(filter, &user_id, search_term.as_deref());
+    let list = if inbox_filter.is_active() {
+        serde_json::to_string(&(filter, inbox_filter)).unwrap_or_default()
+    } else {
+        filter.to_string()
+    };
+    let scope = cursor_scope(&list, &user_id, search_term.as_deref());
+    let kind_ids = inbox_kind_ids(inbox_filter);
 
-    async {
+    // Boxed: the filter and union branches make this future large for callers.
+    Box::pin(async {
         let base = {
             let mut q = NotificationModel::query(valence, valence::use_!(r"In **notifications**, we **list Notification Model** so the product can show or process the matching set for this workflow. Callers allowed for **notifications** use the list; it is not a public dump of every field to anonymous visitors."))
                 .where_user(RecordPredicate::Equals(user_id.clone()));
@@ -496,16 +545,36 @@ pub async fn notifications_page_for_request(
             q
         };
 
-        let filtered = if let Some(ref term) = search_term {
-            let by_title = base
-                .clone()
-                .where_title(StringPredicate::Contains(term.clone()));
-            let by_message = base
-                .clone()
-                .where_message(StringPredicate::Contains(term.clone()));
-            by_title.union(by_message)
-        } else {
-            base.clone()
+        let by_kind: Vec<NotificationQuery<'_>> = match &kind_ids {
+            None => vec![base],
+            Some(ids) => ids
+                .iter()
+                .map(|id| {
+                    base.clone()
+                        .where_kind(StringPredicate::Equals((*id).to_string()))
+                })
+                .collect(),
+        };
+        let branches: Vec<NotificationQuery<'_>> = match search_term {
+            Some(ref term) => by_kind
+                .into_iter()
+                .flat_map(|q| {
+                    [
+                        q.clone()
+                            .where_title(StringPredicate::Contains(term.clone())),
+                        q.where_message(StringPredicate::Contains(term.clone())),
+                    ]
+                })
+                .collect(),
+            None => by_kind,
+        };
+        let Some(filtered) = branches.into_iter().reduce(NotificationQuery::union) else {
+            // An active filter that no registered kind matches.
+            tracing::Span::current().record("result_len", 0);
+            return Ok(Page {
+                total_count: (offset == 0).then_some(0),
+                ..Page::default()
+            });
         };
 
         let read = read_page(filtered.clone(), request, &scope, limit).await?;
@@ -536,10 +605,11 @@ pub async fn notifications_page_for_request(
         limit,
         filter,
         has_query,
+        inbox_filter = inbox_filter.is_active(),
         path = tracing::field::Empty,
         rows_read = tracing::field::Empty,
         result_len = tracing::field::Empty,
-    ))
+    )))
     .await
 }
 

@@ -266,10 +266,10 @@ mod write;
 
 #[cfg(feature = "ssr")]
 pub use ops::{
-    list_for_user, mark_all_read_for_user, mark_read_for_user, mark_unread_for_user,
-    notification_count_for_user, notifications_page_for_request, notifications_page_for_user,
-    today_count_for_user, unread_count_for_user, unread_page_for_request, unread_page_for_user,
-    unread_preview_for_user, NotificationOpsError,
+    inbox_page_for_request, list_for_user, mark_all_read_for_user, mark_read_for_user,
+    mark_unread_for_user, notification_count_for_user, notifications_page_for_request,
+    notifications_page_for_user, today_count_for_user, unread_count_for_user,
+    unread_page_for_request, unread_page_for_user, unread_preview_for_user, NotificationOpsError,
 };
 
 #[cfg(feature = "ssr")]
@@ -277,6 +277,10 @@ pub use uf_notifications_core::NotificationDto;
 
 #[cfg(not(feature = "ssr"))]
 pub use dto::NotificationDto;
+pub use dto::{
+    ChannelsDto, DigestFrequency, KindDto, KindPreferenceDto, NotificationChannel,
+    NotificationInboxFilter, PreferencesDto, SettingsDto,
+};
 
 #[cfg(feature = "ssr")]
 pub use uf_notifications_core::Notification as NotificationModel;
@@ -287,10 +291,14 @@ pub use uf_notifications_core::{
 };
 
 pub use orbital_paging::{Page, PageRequest};
+#[cfg(feature = "ssr")]
+pub use read::preferences_for_user;
 pub use read::{
-    get_notification_count, get_notifications_by_request, get_notifications_page, get_today_count,
-    get_unread_count, get_unread_notifications_by_request, get_unread_notifications_page,
-    get_unread_notifications_preview, list_notifications, subscribe_get_unread_count,
+    get_inbox_by_request, get_notification_count, get_notification_preferences,
+    get_notifications_by_request, get_notifications_page, get_today_count, get_unread_count,
+    get_unread_notifications_by_request, get_unread_notifications_page,
+    get_unread_notifications_preview, list_notification_kinds, list_notifications,
+    subscribe_get_unread_count,
 };
 pub use session::{
     cap_notification_count, clamp_notification_page_limit, parse_session_user_id,
@@ -299,7 +307,10 @@ pub use session::{
 };
 #[cfg(feature = "dev-tools")]
 pub use write::create_test_notification;
-pub use write::{mark_all_notifications_read, mark_notification_read, mark_notification_unread};
+pub use write::{
+    mark_all_notifications_read, mark_notification_read, mark_notification_unread,
+    set_notification_channel, set_notification_settings,
+};
 
 #[cfg(test)]
 mod tests {

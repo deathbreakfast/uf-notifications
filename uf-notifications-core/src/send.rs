@@ -33,7 +33,12 @@ fn truncate_chars(input: String, max: usize) -> String {
 pub struct SendNotification {
     /// The recipient user's Valence record id.
     pub user_id: valence::RecordId,
-    /// Free-form notification category (e.g. `"leaderboard"`), used for filtering/icons.
+    /// Notification kind id, `<app>.<name>` (e.g. `"magnon.assigned"`).
+    ///
+    /// A [registered](mod@crate::kinds) id fills in the kind's app, label and
+    /// `asks_action` on the returned [`NotificationDto`]. An unregistered kind
+    /// is still stored and shown in-app, logs one `warn` per kind, and is
+    /// treated as in-app only.
     pub kind: String,
     /// Notification title.
     pub title: String,
@@ -182,6 +187,9 @@ pub async fn send_notification(
     let user_id_str = params.user_id.to_string();
     let safe_url = sanitize_notification_url(params.url);
     let kind = truncate_chars(params.kind, MAX_NOTIFICATION_KIND_CHARS);
+    if crate::kinds::kind(&kind).is_none() {
+        crate::kinds::warn_unregistered_once(&kind);
+    }
     let title = truncate_chars(params.title, MAX_NOTIFICATION_TITLE_CHARS);
     let message = truncate_chars(params.message, MAX_NOTIFICATION_MESSAGE_CHARS);
     let data_json = params
