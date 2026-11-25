@@ -3,7 +3,9 @@
 use leptos::prelude::*;
 use orbital_paging::{Page, PageRequest};
 
-use crate::{NotificationDto, NotificationReadFilter};
+use crate::{
+    KindDto, NotificationDto, NotificationInboxFilter, NotificationReadFilter, PreferencesDto,
+};
 
 #[cfg(feature = "ssr")]
 use crate::ops;
@@ -245,4 +247,110 @@ pub async fn get_notification_count() -> Result<usize, ServerFnError> {
     ops::notification_count_for_user(&v, user_id)
         .await
         .map_err(map_ops_err)
+}
+
+/// Get a page of the inbox filtered to kinds that ask for action and/or one app.
+///
+/// Same rows as [`get_notifications_by_request`], narrowed by `filter`:
+/// `asks_action` keeps kinds that ask the reader to act and `app_id` keeps one
+/// app's kinds, both from the kind registry. Unregistered kinds never match an
+/// active filter. A default filter returns the same page as
+/// [`get_notifications_by_request`].
+///
+/// # Errors
+///
+/// Same auth and store semantics as [`list_notifications`]. An unusable cursor
+/// falls back to `offset` and does not produce an error.
+#[server]
+pub async fn get_inbox_by_request(
+    /// Offset, limit and cursor; sort, filter and quick search are ignored.
+    request: PageRequest,
+    /// Optional free-text search matched against title and message.
+    query: Option<String>,
+    /// Read-status filter to apply.
+    read_filter: NotificationReadFilter,
+    /// Asks-for-action and app filter.
+    filter: NotificationInboxFilter,
+) -> Result<Page<NotificationDto>, ServerFnError> {
+    let (ctx, user_id) = require_auth_user().await?;
+    let v = user_valence(&ctx)?;
+    ops::inbox_page_for_request(&v, user_id, &request, query, read_filter, &filter)
+        .await
+        .map_err(map_ops_err)
+}
+
+/// List every registered notification kind with its default channels,
+/// grouped by app (sorted by app, then label).
+///
+/// # Errors
+///
+/// Returns [`ServerFnError`] when the caller is not signed in, like
+/// [`list_notifications`]. The registry itself cannot fail.
+#[server]
+pub async fn list_notification_kinds() -> Result<Vec<KindDto>, ServerFnError> {
+    let _ = require_auth_user().await?;
+    Ok(uf_notifications_core::kinds()
+        .into_iter()
+        .map(KindDto::from)
+        .collect())
+}
+
+/// Get the signed-in person's notification preferences: every registered kind
+/// with its effective channels, their digest and quiet-hours settings, and
+/// whether their email and phone are verified.
+///
+/// # Errors
+///
+/// Same auth semantics as [`list_notifications`]; a failed preference read or
+/// verification check maps to `"notification store failed"`.
+#[server]
+pub async fn get_notification_preferences() -> Result<PreferencesDto, ServerFnError> {
+    let (ctx, user_id) = require_auth_user().await?;
+    let v = user_valence(&ctx)?;
+    preferences_for_user(&v, &user_id)
+        .await
+        .map_err(map_ops_err)
+}
+
+/// [`get_notification_preferences`] for `user` as the actor on `valence`
+/// (testable without Higgs). Reads as that actor; never elevates.
+///
+/// # Errors
+///
+/// Returns [`ops::NotificationOpsError::Store`] when a preference read or the
+/// host's verification check fails.
+#[cfg(feature = "ssr")]
+pub async fn preferences_for_user(
+    valence: &valence::Valence,
+    user: &valence::RecordId,
+) -> Result<PreferencesDto, ops::NotificationOpsError> {
+    use std::collections::HashMap;
+    use uf_notifications_core::{
+        contact_verified, load_preferences, load_settings, mask_unverified,
+    };
+
+    let store = |_| ops::NotificationOpsError::Store;
+    let saved: HashMap<String, uf_notifications_core::Channels> = load_preferences(valence, user)
+        .await
+        .map_err(store)?
+        .into_iter()
+        .collect();
+    let settings = load_settings(valence, user).await.map_err(store)?;
+    let (email_verified, text_verified) = contact_verified(user, valence).await.map_err(store)?;
+    let kinds = uf_notifications_core::kinds()
+        .into_iter()
+        .map(|k| {
+            let stored = saved.get(k.id).copied().unwrap_or(k.defaults);
+            crate::KindPreferenceDto {
+                kind: KindDto::from(k),
+                channels: mask_unverified(stored, email_verified, text_verified).into(),
+            }
+        })
+        .collect();
+    Ok(PreferencesDto {
+        kinds,
+        settings: settings.into(),
+        email_verified,
+        text_verified,
+    })
 }

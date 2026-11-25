@@ -14,6 +14,9 @@
 //!   [Get started](#client-dto)
 //! - **URL sanitization** — Reject open redirects and unsafe paths before a notification
 //!   link reaches the client. [Get started](#sanitize-urls)
+//! - **Notification kinds and preferences** — Apps register each kind they send;
+//!   people turn channels on or off per kind and set digest and quiet hours.
+//!   [Get started](#kinds-and-preferences)
 //! - **Live push events** — Publish a topic-keyed Photon event after a notification is
 //!   created so connected clients can refetch their badge. [Get started](#live-push)
 //!
@@ -159,6 +162,29 @@
 //! Next: [`events`] module for the topic macro contract, or
 //! `uf-notifications-api` live unread badge for the subscribe/refetch path.
 //!
+//! ## Kinds and preferences
+//!
+//! Register each kind next to the app's `uf_app!` with
+//! `inventory::submit! { NotificationKind { .. } }` (see [`mod@kinds`]) and pass its id as
+//! [`SendNotification::kind`]. [`effective_channels`] answers which channels a kind uses
+//! for one person: their saved choice from [`set_channel`], else the kind's defaults,
+//! with email and text off until the host's [`ContactVerification`] says the contact is
+//! verified. [`load_settings`] and [`save_settings`] hold digest and quiet hours. All of
+//! these run as the person through Valence privacy, and both tables are deleted with
+//! the account.
+//!
+//! ```rust,no_run
+//! # async fn demo(valence: &valence::Valence) -> valence::Result<()> {
+//! use uf_notifications_core::effective_channels;
+//! use valence::RecordId;
+//!
+//! let alice = RecordId::new("user", "alice");
+//! let channels = effective_channels(valence, &alice, "magnon.assigned").await?;
+//! assert!(channels.in_app);
+//! # Ok(())
+//! # }
+//! ```
+//!
 //! ## Examples
 //!
 //! Start with [Send notification](#send-notification). Unit tests in this crate cover relative
@@ -171,6 +197,7 @@ pub mod create_policy;
 pub mod embedded_surreal;
 pub mod events;
 pub mod generated;
+pub mod kinds;
 
 mod dto;
 mod schemas;
@@ -180,6 +207,15 @@ mod url;
 pub use audience::{register_notification_audience, NotificationAudienceCheck};
 pub use create_policy::{ScopedNotificationCreate, SCOPED_NOTIFICATION_CREATE};
 pub use dto::{notification_to_dto, NotificationDto};
-pub use generated::Notification;
+pub use generated::{Notification, NotificationPreference, NotificationSettings};
+/// Re-exported so senders can register kinds with
+/// `uf_notifications_core::inventory::submit!`.
+pub use inventory;
+pub use kinds::{
+    contact_verified, effective_channels, kind, kinds, kinds_for_app, load_preferences,
+    load_settings, mask_unverified, register_contact_verification, save_settings, set_channel,
+    Channel, Channels, ContactVerification, Digest, NotificationKind, PreferenceError, Settings,
+    MAX_TIME_ZONE_CHARS,
+};
 pub use send::{send_notification, SendNotification, SendNotificationError};
 pub use url::{is_safe_notification_path, sanitize_notification_url};

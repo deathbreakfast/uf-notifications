@@ -3,6 +3,8 @@
 use leptos::prelude::*;
 use uuid::Uuid;
 
+use crate::{NotificationChannel, SettingsDto};
+
 #[cfg(feature = "ssr")]
 use crate::ops;
 #[cfg(feature = "ssr")]
@@ -86,6 +88,64 @@ pub async fn mark_notification_unread(
     ops::mark_unread_for_user(&v, notification_id)
         .await
         .map_err(map_ops_err)
+}
+
+/// Map a preference failure to a fixed client-visible message (no Valence text).
+#[cfg(feature = "ssr")]
+fn map_pref_err(err: uf_notifications_core::PreferenceError) -> ServerFnError {
+    use uf_notifications_core::PreferenceError;
+    ServerFnError::new(match err {
+        PreferenceError::UnknownKind => "unknown notification kind",
+        PreferenceError::InvalidSettings(_) => "invalid notification settings",
+        PreferenceError::Store(_) => "notification store failed",
+    })
+}
+
+/// Turn one channel on or off for one notification kind for the signed-in person.
+///
+/// The first change for a kind starts from its defaults. Email and text are
+/// saved as chosen but only take effect once the contact is verified.
+///
+/// # Errors
+///
+/// Same auth failures as [`crate::list_notifications`];
+/// `"unknown notification kind"` for an unregistered `kind_id`;
+/// `"notification store failed"` when the write fails.
+#[server]
+pub async fn set_notification_channel(
+    /// Registered kind id, for example `magnon.assigned`.
+    kind_id: String,
+    /// Channel to change.
+    channel: NotificationChannel,
+    /// Whether the channel is on.
+    on: bool,
+) -> Result<(), ServerFnError> {
+    let (ctx, user_id) = require_auth_user().await?;
+    let v = user_valence(&ctx)?;
+    uf_notifications_core::set_channel(&v, &user_id, &kind_id, channel.into(), on)
+        .await
+        .map(|_| ())
+        .map_err(map_pref_err)
+}
+
+/// Save the signed-in person's digest and quiet-hours settings.
+///
+/// # Errors
+///
+/// Same auth failures as [`crate::list_notifications`];
+/// `"invalid notification settings"` when a quiet-hours time is not `"HH:MM"`
+/// or the time zone is empty or too long; `"notification store failed"` when
+/// the write fails.
+#[server]
+pub async fn set_notification_settings(
+    /// Digest, quiet hours and time zone.
+    settings: SettingsDto,
+) -> Result<(), ServerFnError> {
+    let (ctx, user_id) = require_auth_user().await?;
+    let v = user_valence(&ctx)?;
+    uf_notifications_core::save_settings(&v, &user_id, settings.into())
+        .await
+        .map_err(map_pref_err)
 }
 
 /// Helper server function to create test notifications (development builds only).
