@@ -108,6 +108,8 @@ pub struct SettingsDto {
 }
 
 /// Everything the preferences page shows for the signed-in person.
+// A wire DTO: one flag per fact the page shows.
+#[allow(clippy::struct_excessive_bools)]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct PreferencesDto {
     /// Every registered kind, sorted by app then label, with effective channels.
@@ -118,6 +120,11 @@ pub struct PreferencesDto {
     pub email_verified: bool,
     /// Whether the person has a verified phone for text messages.
     pub text_verified: bool,
+    /// Whether the host installed an email channel.
+    pub email_configured: bool,
+    /// Whether the host installed a text channel. Hide the Text column and
+    /// the phone card when this is `false`.
+    pub text_configured: bool,
 }
 
 /// Inbox filters on top of the read filter and search.
@@ -244,6 +251,8 @@ mod tests {
             },
             email_verified: false,
             text_verified: false,
+            email_configured: true,
+            text_configured: false,
         };
         let json = serde_json::to_string(&dto).expect("serialize");
         let back: PreferencesDto = serde_json::from_str(&json).expect("deserialize");

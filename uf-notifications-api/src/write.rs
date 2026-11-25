@@ -148,6 +148,69 @@ pub async fn set_notification_settings(
         .map_err(map_pref_err)
 }
 
+/// Map a phone verification failure to a fixed client-visible message.
+#[cfg(feature = "ssr")]
+fn map_phone_err(err: uf_notifications_core::PhoneVerificationError) -> ServerFnError {
+    use uf_notifications_core::PhoneVerificationError as E;
+    ServerFnError::new(match err {
+        E::InvalidNumber => "invalid phone number",
+        E::TextNotConfigured => "text messages are not available",
+        E::TooSoon => "wait a minute before asking for another code",
+        E::NoPendingCode => "no verification code is waiting",
+        E::Expired => "code expired",
+        E::WrongCode => "wrong code",
+        E::TooManyTries => "too many tries",
+        E::Send(_) => "could not send the code",
+        E::Store(_) => "notification store failed",
+    })
+}
+
+/// Text a 6-digit code to `number` so the signed-in person can verify it.
+///
+/// The code expires after 10 minutes and allows 5 tries; only its hash is
+/// stored. A number already verified stays in use until the new one is
+/// confirmed with [`confirm_phone_verification`].
+///
+/// # Errors
+///
+/// Same auth failures as [`crate::list_notifications`];
+/// `"invalid phone number"` unless the number is E.164 (`+` and 8 to 15
+/// digits); `"text messages are not available"` when the host has no text
+/// channel; `"wait a minute before asking for another code"`;
+/// `"could not send the code"`; `"notification store failed"`.
+#[server]
+pub async fn start_phone_verification(
+    /// Phone number in E.164 form, for example `+353861234567`. Spaces,
+    /// dashes and parentheses are ignored.
+    number: String,
+) -> Result<(), ServerFnError> {
+    let (ctx, user_id) = require_auth_user().await?;
+    let v = user_valence(&ctx)?;
+    uf_notifications_core::start_phone_verification(&v, &user_id, &number)
+        .await
+        .map_err(map_phone_err)
+}
+
+/// Check the code from [`start_phone_verification`] and, when it matches,
+/// save the number as the signed-in person's verified phone.
+///
+/// # Errors
+///
+/// Same auth failures as [`crate::list_notifications`];
+/// `"no verification code is waiting"`, `"code expired"`, `"wrong code"`,
+/// `"too many tries"` or `"notification store failed"`.
+#[server]
+pub async fn confirm_phone_verification(
+    /// The 6-digit code from the text message.
+    code: String,
+) -> Result<(), ServerFnError> {
+    let (ctx, user_id) = require_auth_user().await?;
+    let v = user_valence(&ctx)?;
+    uf_notifications_core::confirm_phone_verification(&v, &user_id, &code)
+        .await
+        .map_err(map_phone_err)
+}
+
 /// Helper server function to create test notifications (development builds only).
 ///
 /// Gated behind the `dev-tools` feature so production SSR builds do not expose

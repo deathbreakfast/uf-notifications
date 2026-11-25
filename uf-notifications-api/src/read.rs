@@ -326,7 +326,8 @@ pub async fn preferences_for_user(
 ) -> Result<PreferencesDto, ops::NotificationOpsError> {
     use std::collections::HashMap;
     use uf_notifications_core::{
-        contact_verified, load_preferences, load_settings, mask_unverified,
+        channel_configured, contact_verified, load_preferences, load_settings, mask_unverified,
+        ChannelKind,
     };
 
     let store = |_| ops::NotificationOpsError::Store;
@@ -352,5 +353,7 @@ pub async fn preferences_for_user(
         settings: settings.into(),
         email_verified,
         text_verified,
+        email_configured: channel_configured(valence, ChannelKind::Email),
+        text_configured: channel_configured(valence, ChannelKind::Text),
     })
 }

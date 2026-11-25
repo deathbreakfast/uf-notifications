@@ -25,6 +25,23 @@ chrono = { workspace = true, features = ["serde"] }
 tracing.workspace = true
 async-trait.workspace = true
 futures = { version = "0.3", default-features = false, features = ["alloc"] }
+anyhow.workspace = true
+log.workspace = true
+chrono-tz = "0.10"
+sha2 = "0.10"
+rand = "0.8"
+hex = "0.4"
+
+boson-core.workspace = true
+boson-macros.workspace = true
+boson-runtime.workspace = true
+boson-valence-identity.workspace = true
+quark.workspace = true
+chronon-core.workspace = true
+chronon-executor.workspace = true
+chronon-coordinator.workspace = true
+chronon-coordinator-macros.workspace = true
+chronon-valence-identity.workspace = true
 
 [features]
 default = ["db-sqlite"]

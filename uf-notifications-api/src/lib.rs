@@ -308,8 +308,9 @@ pub use session::{
 #[cfg(feature = "dev-tools")]
 pub use write::create_test_notification;
 pub use write::{
-    mark_all_notifications_read, mark_notification_read, mark_notification_unread,
-    set_notification_channel, set_notification_settings,
+    confirm_phone_verification, mark_all_notifications_read, mark_notification_read,
+    mark_notification_unread, set_notification_channel, set_notification_settings,
+    start_phone_verification,
 };
 
 #[cfg(test)]

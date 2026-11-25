@@ -67,6 +67,23 @@ project mishandles them in a security-relevant way.
 - **Read and mark-read/unread** are `OWNER_BY_USER_FIELD` plus a Higgs session
   on the `#[server]` paths. A guessed notification UUID must not leak another
   user's row.
+- **Email and text delivery** runs in a Boson task (`notifications.deliver`)
+  and, for quiet hours, a Chronon run-once job (`notifications.deliver_later`),
+  both as the service actor `ServiceUser { service_name: "svc:notifications" }`.
+  `send_notification` enqueues the task with that actor because the sender
+  can't read the recipient's preferences, and System would be a mid-request
+  elevation. `NOTIFICATION_DELIVERY` admits only that service name: read on
+  `notification`, `notification_preference`, `notification_settings` and
+  `notification_contact`, and update on `notification` for the delivery
+  fields. It never creates or deletes notifications. Hosts must not let
+  request input choose the actor JSON of a Boson task.
+- **Digest and retention** (`notifications.digest`, `notifications.retention`)
+  are Chronon default jobs the host registers with a System Valence. They read
+  settings, preferences and contacts and delete old rows under `SYSTEM_ONLY`
+  as the job's own actor.
+- **Phone verification** stores only a salted SHA-256 of the 6-digit code on
+  the owner-only `notification_contact` row, with a 10-minute expiry, 5 tries
+  and one code a minute. Server functions never return the row.
 - **`dev-tools`** compiles `create_test_notification`. Leave that feature off
   of `default`, `ssr`, and `hydrate`. Production hosts must not enable it.
 - Action URLs are same-origin relative paths (`sanitize_notification_url`).

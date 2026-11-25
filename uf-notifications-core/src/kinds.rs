@@ -148,8 +148,15 @@ pub(crate) fn warn_unregistered_once(kind: &str) -> bool {
 /// Whether a person's email address and phone are verified, implemented by the host.
 ///
 /// Email and text stay off in [`effective_channels`] until these say yes.
-/// Both default to "not verified". Check as the actor on `valence`; never
-/// elevate to System.
+/// Everything defaults to "not verified". Email verification belongs to the
+/// host (Lepton); a phone verified through
+/// [`start_phone_verification`](crate::phone::start_phone_verification) counts
+/// whatever [`phone_verified`](Self::phone_verified) answers.
+///
+/// Check as the actor on `valence`; never elevate to System. Delivery calls
+/// these as the `svc:notifications` service actor
+/// ([`delivery_actor`](crate::delivery_policy::delivery_actor)) and the digest
+/// job as System, so the host's lookup must answer for those actors too.
 #[async_trait::async_trait]
 pub trait ContactVerification: Send + Sync {
     /// Whether `user` has a verified email address.
@@ -162,7 +169,7 @@ pub trait ContactVerification: Send + Sync {
         Ok(false)
     }
 
-    /// Whether `user` has a verified phone number.
+    /// Whether `user` has a verified phone number the host verified itself.
     ///
     /// # Errors
     ///
@@ -170,6 +177,36 @@ pub trait ContactVerification: Send + Sync {
     async fn phone_verified(&self, user: &RecordId, valence: &Valence) -> valence::Result<bool> {
         let _ = (user, valence);
         Ok(false)
+    }
+
+    /// `user`'s verified email address, used to deliver email. `None` (the
+    /// default) means email is never sent even when verified.
+    ///
+    /// # Errors
+    ///
+    /// Returns the underlying Valence error when the lookup fails.
+    async fn verified_email(
+        &self,
+        user: &RecordId,
+        valence: &Valence,
+    ) -> valence::Result<Option<String>> {
+        let _ = (user, valence);
+        Ok(None)
+    }
+
+    /// A phone number the host verified itself, in E.164, used when the
+    /// person has no number verified through this crate. Defaults to `None`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the underlying Valence error when the lookup fails.
+    async fn verified_phone(
+        &self,
+        user: &RecordId,
+        valence: &Valence,
+    ) -> valence::Result<Option<String>> {
+        let _ = (user, valence);
+        Ok(None)
     }
 }
 
@@ -186,23 +223,68 @@ pub fn register_contact_verification(check: Arc<dyn ContactVerification>) {
         .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(check);
 }
 
+fn verification_check() -> Option<Arc<dyn ContactVerification>> {
+    verification_slot()
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone()
+}
+
 /// Whether `user`'s email and phone are verified, as `(email, phone)`.
-/// Without a registered [`ContactVerification`], neither is.
+///
+/// Email comes from the registered [`ContactVerification`]. The phone counts
+/// as verified when the person verified one through
+/// [`start_phone_verification`](crate::phone::start_phone_verification), or
+/// when the host's check says so. Without a registered check, only a phone
+/// verified here counts.
 ///
 /// # Errors
 ///
-/// Returns the Valence error from the host's check.
+/// Returns the Valence error from the contact read or the host's check.
 pub async fn contact_verified(user: &RecordId, valence: &Valence) -> valence::Result<(bool, bool)> {
-    let check = verification_slot()
-        .read()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .clone();
-    match check {
+    let own_phone = crate::phone::verified_phone(valence, user).await?.is_some();
+    match verification_check() {
         Some(check) => Ok((
             check.email_verified(user, valence).await?,
-            check.phone_verified(user, valence).await?,
+            own_phone || check.phone_verified(user, valence).await?,
         )),
-        None => Ok((false, false)),
+        None => Ok((false, own_phone)),
+    }
+}
+
+/// Where to deliver `channel` to `user`: the host's verified email, or the
+/// phone verified here, else the host's verified phone.
+///
+/// # Errors
+///
+/// Returns the Valence error from the contact read or the host's check.
+pub(crate) async fn verified_contact(
+    user: &RecordId,
+    valence: &Valence,
+    channel: crate::channels::ChannelKind,
+) -> valence::Result<Option<crate::channels::Contact>> {
+    use crate::channels::{ChannelKind, Contact};
+    let check = verification_check();
+    match channel {
+        ChannelKind::Email => match check {
+            Some(check) if check.email_verified(user, valence).await? => Ok(check
+                .verified_email(user, valence)
+                .await?
+                .map(Contact::Email)),
+            _ => Ok(None),
+        },
+        ChannelKind::Text => {
+            if let Some(phone) = crate::phone::verified_phone(valence, user).await? {
+                return Ok(Some(Contact::Phone(phone)));
+            }
+            match check {
+                Some(check) if check.phone_verified(user, valence).await? => Ok(check
+                    .verified_phone(user, valence)
+                    .await?
+                    .map(Contact::Phone)),
+                _ => Ok(None),
+            }
+        }
     }
 }
 
@@ -445,7 +527,7 @@ pub async fn load_settings(valence: &Valence, user: &RecordId) -> valence::Resul
 }
 
 /// Whether `s` is a 24-hour `"HH:MM"` time.
-fn is_hh_mm(s: &str) -> bool {
+pub(crate) fn is_hh_mm(s: &str) -> bool {
     let b = s.as_bytes();
     b.len() == 5
         && b[2] == b':'
@@ -475,6 +557,10 @@ pub async fn save_settings(
     if tz.is_empty() || tz.chars().count() > MAX_TIME_ZONE_CHARS {
         return Err(PreferenceError::InvalidSettings("time zone"));
     }
+    // Keep when the last digest went out, so changing settings never resends it.
+    let last_digest_at = NotificationSettings::get(user.id(), valence, valence::use_!(r"On the **notification preferences page**, before saving the signed-in person's digest or quiet hours, we **read Notification Settings** to keep when their last digest went out. Only that person reads the row."))
+        .await?
+        .and_then(|r| r.last_digest_at().copied());
     let row = NotificationSettings::new(
         user.clone(),
         settings.digest.into(),
@@ -483,6 +569,7 @@ pub async fn save_settings(
         settings.quiet_end,
         tz.to_string(),
         Utc::now(),
+        last_digest_at,
     )?;
     NotificationSettings::upsert(user.id(), row, valence, valence::use_!(r"On the **notification preferences page**, we **save Notification Settings** when the signed-in person changes their digest or quiet hours, so **notification delivery** follows them. Only that person writes the row.")).await?;
     Ok(())

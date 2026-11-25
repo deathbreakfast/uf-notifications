@@ -291,6 +291,62 @@ dependencies = [
 ]
 
 [[package]]
+name = "boson-core"
+version = "0.1.4"
+source = "git+https://github.com/unified-field-dev/boson?branch=main#8febfbdaf6d17efffe0eb6e7b54dab044e999325"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "uuid",
+]
+
+[[package]]
+name = "boson-macros"
+version = "0.1.4"
+source = "git+https://github.com/unified-field-dev/boson?branch=main#8febfbdaf6d17efffe0eb6e7b54dab044e999325"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "boson-runtime"
+version = "0.1.4"
+source = "git+https://github.com/unified-field-dev/boson?branch=main#8febfbdaf6d17efffe0eb6e7b54dab044e999325"
+dependencies = [
+ "async-trait",
+ "boson-core",
+ "boson-telemetry",
+ "chrono",
+ "serde_json",
+ "tokio",
+ "uf-quark",
+]
+
+[[package]]
+name = "boson-telemetry"
+version = "0.1.4"
+source = "git+https://github.com/unified-field-dev/boson?branch=main#8febfbdaf6d17efffe0eb6e7b54dab044e999325"
+dependencies = [
+ "serde_json",
+]
+
+[[package]]
+name = "boson-valence-identity"
+version = "0.1.0"
+source = "git+https://github.com/unified-field-dev/boson-valence-identity?branch=main#d2a6794f0c393a16b82ebe2c174b2086de0534eb"
+dependencies = [
+ "boson-core",
+ "serde",
+ "serde_json",
+ "uf-valence",
+]
+
+[[package]]
 name = "bumpalo"
 version = "3.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -372,6 +428,112 @@ dependencies = [
  "serde",
  "wasm-bindgen",
  "windows-link",
+]
+
+[[package]]
+name = "chrono-tz"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a6139a8597ed92cf816dfb33f5dd6cf0bb93a6adc938f11039f371bc5bcd26c3"
+dependencies = [
+ "chrono",
+ "phf",
+]
+
+[[package]]
+name = "chronon-coordinator"
+version = "0.1.0"
+source = "git+https://github.com/unified-field-dev/chronon-coordinator?branch=main#66357e5d36649270cbac5aa40a15753a56e77e03"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "chronon-core",
+ "chronon-executor",
+ "chronon-scheduler",
+ "log",
+ "serde",
+ "serde_json",
+ "uf-quark",
+ "uf-valence",
+]
+
+[[package]]
+name = "chronon-coordinator-macros"
+version = "0.1.0"
+source = "git+https://github.com/unified-field-dev/chronon-coordinator-macros?branch=main#5b7eb344b4ad1822dea6dc71e4ff5dba116ea4ab"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde_json",
+ "syn 2.0.119",
+]
+
+[[package]]
+name = "chronon-core"
+version = "0.1.4"
+source = "git+https://github.com/unified-field-dev/chronon?branch=main#7a3e56f50aff8685d8dffa8b99c2950c06531b71"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "parking_lot",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "uuid",
+]
+
+[[package]]
+name = "chronon-executor"
+version = "0.1.4"
+source = "git+https://github.com/unified-field-dev/chronon?branch=main#7a3e56f50aff8685d8dffa8b99c2950c06531b71"
+dependencies = [
+ "chrono",
+ "chronon-core",
+ "chronon-telemetry",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uf-quark",
+]
+
+[[package]]
+name = "chronon-scheduler"
+version = "0.1.4"
+source = "git+https://github.com/unified-field-dev/chronon?branch=main#7a3e56f50aff8685d8dffa8b99c2950c06531b71"
+dependencies = [
+ "chrono",
+ "chrono-tz",
+ "chronon-core",
+ "chronon-telemetry",
+ "croner",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "uuid",
+ "xxhash-rust",
+]
+
+[[package]]
+name = "chronon-telemetry"
+version = "0.1.4"
+source = "git+https://github.com/unified-field-dev/chronon?branch=main#7a3e56f50aff8685d8dffa8b99c2950c06531b71"
+dependencies = [
+ "parking_lot",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
+name = "chronon-valence-identity"
+version = "0.1.0"
+source = "git+https://github.com/unified-field-dev/chronon-valence-identity?branch=main#3559594397b4d5197a592ae190a69952f52d61c7"
+dependencies = [
+ "chronon-core",
+ "serde_json",
+ "uf-valence",
 ]
 
 [[package]]
@@ -516,6 +678,15 @@ name = "crc-catalog"
 version = "2.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "217698eaf96b4a3f0bc4f3662aaa55bdf913cd54d7204591faa790070c6d0853"
+
+[[package]]
+name = "croner"
+version = "2.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c344b0690c1ad1c7176fe18eb173e0c927008fdaaa256e40dfd43ddd149c0843"
+dependencies = [
+ "chrono",
+]
 
 [[package]]
 name = "crossbeam-queue"
@@ -1812,6 +1983,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "matchers"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d1525a2a28c7f4fa0fc98bb91ae755d1e2d1505079e05539e35bc876b5d65ae9"
+dependencies = [
+ "regex-automata",
+]
+
+[[package]]
 name = "matchit"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1888,6 +2068,15 @@ dependencies = [
  "serde_json",
  "tokio",
  "tower",
+]
+
+[[package]]
+name = "nu-ansi-term"
+version = "0.50.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
+dependencies = [
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -2049,6 +2238,24 @@ name = "percent-encoding"
 version = "2.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9b4f627cb1b25917193a259e49bdad08f671f8d9708acfd5fe0a8c1455d87220"
+
+[[package]]
+name = "phf"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "913273894cec178f401a31ec4b656318d95473527be05c0752cc41cdc32be8b7"
+dependencies = [
+ "phf_shared",
+]
+
+[[package]]
+name = "phf_shared"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06005508882fb681fd97892ecff4b7fd0fee13ef1aa569f8695dae7ab9099981"
+dependencies = [
+ "siphasher",
+]
 
 [[package]]
 name = "photon-axum"
@@ -2828,6 +3035,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sharded-slab"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f40ca3c46823713e0d4209592e8d6e826aa57e928f09752619fc696c499637f6"
+dependencies = [
+ "lazy_static",
+]
+
+[[package]]
 name = "shlex"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2848,6 +3064,12 @@ name = "simdutf8"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e"
+
+[[package]]
+name = "siphasher"
+version = "1.0.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256"
 
 [[package]]
 name = "slab"
@@ -3256,6 +3478,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "thread_local"
+version = "1.1.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1ad99c4c6d32803332c548b1af0540b357b3f5fc0be8f6c6bfe8b2e6ae784070"
+dependencies = [
+ "cfg-if",
+]
+
+[[package]]
 name = "throw_error"
 version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3450,6 +3681,35 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-log"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ee855f1f400bd0e5c02d150ae5de3840039a3f54b025156404e34c23c03f47c3"
+dependencies = [
+ "log",
+ "once_cell",
+ "tracing-core",
+]
+
+[[package]]
+name = "tracing-subscriber"
+version = "0.3.23"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "cb7f578e5945fb242538965c2d0b04418d38ec25c79d160cd279bf0731c8d319"
+dependencies = [
+ "matchers",
+ "nu-ansi-term",
+ "once_cell",
+ "regex-automata",
+ "sharded-slab",
+ "smallvec",
+ "thread_local",
+ "tracing",
+ "tracing-core",
+ "tracing-log",
+]
+
+[[package]]
 name = "tungstenite"
 version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3520,16 +3780,32 @@ dependencies = [
 name = "uf-notifications-core"
 version = "0.3.0"
 dependencies = [
+ "anyhow",
  "async-trait",
+ "boson-core",
+ "boson-macros",
+ "boson-runtime",
+ "boson-valence-identity",
  "chrono",
+ "chrono-tz",
+ "chronon-coordinator",
+ "chronon-coordinator-macros",
+ "chronon-core",
+ "chronon-executor",
+ "chronon-valence-identity",
  "futures",
+ "hex",
  "inventory",
  "lepton-identity",
+ "log",
+ "rand 0.8.8",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
  "tracing",
  "uf-photon",
+ "uf-quark",
  "uf-valence",
  "uf-valence-codegen",
  "uuid",

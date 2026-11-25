@@ -15,6 +15,14 @@ pub const TEST_USER_A: &str = "notify-test-user-a";
 pub const TEST_USER_B: &str = "notify-test-user-b";
 
 pub async fn setup_valence() -> Valence {
+    setup_valence_with(|b| b).await
+}
+
+/// [`setup_valence`] with a hook on the builder, for example to install
+/// notification channels as a Valence extension.
+pub async fn setup_valence_with(
+    configure: impl FnOnce(valence::ValenceBuilder) -> valence::ValenceBuilder,
+) -> Valence {
     valence::deletion::register_noop_deletion_dispatcher_for_tests();
     valence::clear_for_test();
 
@@ -38,14 +46,16 @@ pub async fn setup_valence() -> Valence {
         RegisterBackendLogicalNamesOptions::default(),
     );
 
-    Valence::builder()
-        .database_router(Arc::new(router))
-        .default_backend_key(valence::router_key("default", SQLITE_ENGINE_ID))
-        .with_actor(Actor::System {
-            operation: "notify_privacy_test".to_string(),
-        })
-        .build()
-        .expect("build valence")
+    configure(
+        Valence::builder()
+            .database_router(Arc::new(router))
+            .default_backend_key(valence::router_key("default", SQLITE_ENGINE_ID))
+            .with_actor(Actor::System {
+                operation: "notify_privacy_test".to_string(),
+            }),
+    )
+    .build()
+    .expect("build valence")
 }
 
 pub async fn seed_user(id: &str, valence: &Valence) {
