@@ -648,3 +648,198 @@ async fn stale_foreign_or_garbage_cursor_falls_back_to_offset_sad() {
     assert_eq!(peer_page.items.len(), 1);
     assert_eq!(peer_page.items[0].title, "PeerOnly");
 }
+
+uf_notifications_core::inventory::submit! {
+    uf_notifications_core::NotificationKind {
+        id: "apitest.approve",
+        app: "apitest",
+        label: "Request to approve",
+        description: "Someone asked you to approve access.",
+        defaults: uf_notifications_core::Channels { in_app: true, email: true, text: false },
+        asks_action: true,
+        urgent: true,
+    }
+}
+
+uf_notifications_core::inventory::submit! {
+    uf_notifications_core::NotificationKind {
+        id: "apitest.answered",
+        app: "apitest",
+        label: "Request answered",
+        description: "Your access request was answered.",
+        defaults: uf_notifications_core::Channels::IN_APP_ONLY,
+        asks_action: false,
+        urgent: false,
+    }
+}
+
+uf_notifications_core::inventory::submit! {
+    uf_notifications_core::NotificationKind {
+        id: "otherapp.mention",
+        app: "otherapp",
+        label: "Mentioned you",
+        description: "Someone mentioned you.",
+        defaults: uf_notifications_core::Channels { in_app: true, email: true, text: false },
+        asks_action: true,
+        urgent: false,
+    }
+}
+
+async fn mint_kind(system: &valence::Valence, user: &str, kind: &str, title: &str) {
+    send_notification(
+        SendNotification {
+            kind: kind.into(),
+            ..sample(user, title)
+        },
+        system,
+    )
+    .await
+    .expect("system mint");
+}
+
+async fn inbox_titles(
+    v: &valence::Valence,
+    user: &str,
+    query: Option<&str>,
+    filter: uf_notifications_api::NotificationInboxFilter,
+) -> Vec<String> {
+    let mut titles: Vec<String> = uf_notifications_api::inbox_page_for_request(
+        v,
+        RecordId::new("user", user),
+        &PageRequest::new(0, 50),
+        query.map(str::to_string),
+        NotificationReadFilter::All,
+        &filter,
+    )
+    .await
+    .expect("inbox page")
+    .items
+    .into_iter()
+    .map(|n| n.title)
+    .collect();
+    titles.sort();
+    titles
+}
+
+#[tokio::test]
+async fn inbox_filter_by_app_and_asks_action_happy_and_empty_sad() {
+    use uf_notifications_api::NotificationInboxFilter;
+
+    let base = setup_shared_db().await;
+    let system = as_system(&base);
+    let owner = as_user(&base, TEST_USER_A);
+    mint_kind(&system, TEST_USER_A, "apitest.approve", "approve me").await;
+    mint_kind(&system, TEST_USER_A, "apitest.answered", "answered").await;
+    mint_kind(&system, TEST_USER_A, "otherapp.mention", "mention").await;
+    mint_kind(&system, TEST_USER_A, "test", "unregistered").await;
+    mint_kind(&system, TEST_USER_B, "apitest.approve", "peer approve").await;
+
+    let all = inbox_titles(
+        &owner,
+        TEST_USER_A,
+        None,
+        NotificationInboxFilter::default(),
+    )
+    .await;
+    assert_eq!(all, ["answered", "approve me", "mention", "unregistered"]);
+
+    let by_app = NotificationInboxFilter {
+        app_id: Some("apitest".into()),
+        ..Default::default()
+    };
+    assert_eq!(
+        inbox_titles(&owner, TEST_USER_A, None, by_app.clone()).await,
+        ["answered", "approve me"]
+    );
+
+    let acting = NotificationInboxFilter {
+        asks_action: true,
+        ..Default::default()
+    };
+    assert_eq!(
+        inbox_titles(&owner, TEST_USER_A, None, acting.clone()).await,
+        ["approve me", "mention"]
+    );
+
+    let both = NotificationInboxFilter {
+        asks_action: true,
+        app_id: Some("apitest".into()),
+    };
+    assert_eq!(
+        inbox_titles(&owner, TEST_USER_A, None, both).await,
+        ["approve me"]
+    );
+
+    // Search combines with the filter.
+    assert_eq!(
+        inbox_titles(&owner, TEST_USER_A, Some("mention"), acting).await,
+        ["mention"]
+    );
+
+    // A filter no registered kind matches is an empty page, not every row.
+    let page = uf_notifications_api::inbox_page_for_request(
+        &owner,
+        RecordId::new("user", TEST_USER_A),
+        &PageRequest::new(0, 50),
+        None,
+        NotificationReadFilter::All,
+        &NotificationInboxFilter {
+            app_id: Some("no-such-app".into()),
+            ..Default::default()
+        },
+    )
+    .await
+    .expect("empty filter page");
+    assert_eq!(page.items.len(), 0);
+    assert_eq!(page.total_count, Some(0));
+
+    // The DTO carries the registry fields.
+    let rows = list_for_user(&owner, RecordId::new("user", TEST_USER_A))
+        .await
+        .unwrap();
+    let approve = rows.iter().find(|n| n.title == "approve me").unwrap();
+    assert_eq!(approve.kind_id.as_deref(), Some("apitest.approve"));
+    assert_eq!(approve.kind_label.as_deref(), Some("Request to approve"));
+    assert_eq!(approve.app_id.as_deref(), Some("apitest"));
+    assert!(approve.asks_action);
+    let unregistered = rows.iter().find(|n| n.title == "unregistered").unwrap();
+    assert_eq!(unregistered.app_id, None);
+}
+
+#[tokio::test]
+async fn preferences_for_user_lists_every_kind_and_follows_saved_choice() {
+    use uf_notifications_core::{set_channel, Channel};
+
+    let base = setup_shared_db().await;
+    let owner = as_user(&base, TEST_USER_A);
+    let me = RecordId::new("user", TEST_USER_A);
+
+    let prefs = uf_notifications_api::preferences_for_user(&owner, &me)
+        .await
+        .expect("preferences");
+    let ids: Vec<_> = prefs.kinds.iter().map(|k| k.kind.id.as_str()).collect();
+    assert_eq!(
+        ids,
+        ["apitest.answered", "apitest.approve", "otherapp.mention"]
+    );
+    assert!(!prefs.email_verified && !prefs.text_verified);
+    let approve = &prefs.kinds[1];
+    assert!(
+        approve.kind.defaults.email,
+        "default is listed as registered"
+    );
+    assert!(!approve.channels.email, "email masked until verified");
+    assert!(approve.channels.in_app);
+    assert_eq!(
+        prefs.settings.digest,
+        uf_notifications_api::DigestFrequency::Instant
+    );
+
+    set_channel(&owner, &me, "apitest.approve", Channel::InApp, false)
+        .await
+        .unwrap();
+    let after = uf_notifications_api::preferences_for_user(&owner, &me)
+        .await
+        .unwrap();
+    assert!(!after.kinds[1].channels.in_app, "saved choice wins");
+}
