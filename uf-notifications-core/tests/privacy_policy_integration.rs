@@ -68,6 +68,9 @@ async fn mint_row(system: &valence::Valence, owner: &str) -> String {
         Utc::now(),
         None,
         None,
+        None,
+        None,
+        None,
     )
     .expect("construct notification");
     Notification::upsert(&id, row, system, valence::use_!(r"**Test:** Fixture **Notification** save for `tests` so the suite can arrange and assert persistence behavior. CI and developers running the suite only."))
@@ -204,6 +207,9 @@ async fn scoped_create_forged_sender_denied_sad() {
         Utc::now(),
         Some(RecordId::new("user", TEST_USER_B)),
         Some(subject),
+        None,
+        None,
+        None,
     )
     .expect("construct notification");
     let result = Notification::upsert(&Uuid::new_v4().to_string(), forged, &actor, valence::use_!(r"**Test:** Fixture **Notification** save for `tests` so the suite can arrange and assert persistence behavior. CI and developers running the suite only.")).await;
@@ -336,6 +342,9 @@ async fn legacy_create_forged_sender_denied_sad() {
         None,
         Utc::now(),
         Some(RecordId::new("user", TEST_USER_B)),
+        None,
+        None,
+        None,
         None,
     )
     .expect("construct notification");

@@ -17,6 +17,11 @@
 //! - **Notification kinds and preferences** — Apps register each kind they send;
 //!   people turn channels on or off per kind and set digest and quiet hours.
 //!   [Get started](#kinds-and-preferences)
+//! - **Email and text delivery** — The host installs mail and text channels;
+//!   each notification then goes out by email or text when the recipient's
+//!   preferences say so, held for quiet hours, batched into daily or weekly
+//!   digests, with a retention job and phone verification.
+//!   [Get started](#email-and-text-delivery)
 //! - **Live push events** — Publish a topic-keyed Photon event after a notification is
 //!   created so connected clients can refetch their badge. [Get started](#live-push)
 //!
@@ -95,6 +100,9 @@
 //!     None,
 //!     None,
 //!     Utc::now(),
+//!     None,
+//!     None,
+//!     None,
 //!     None,
 //!     None,
 //! )
@@ -185,6 +193,40 @@
 //! # }
 //! ```
 //!
+//! ## Email and text delivery
+//!
+//! The in-app row is always written. For email and text the host wires three
+//! things at boot; a host that wires none sends in-app only, as before:
+//!
+//! 1. Channels: implement [`NotificationChannel`] over its mail and SMS
+//!    providers and install them with [`NotificationChannels::install`] on the
+//!    Valence builder. [`channel_configured`] tells the preferences page
+//!    whether to show Text.
+//! 2. A Boson runtime (the `notifications.deliver` task) and a Chronon backend
+//!    passed to [`register_delivery_scheduler`] for messages held by quiet
+//!    hours.
+//! 3. Chronon default jobs `notifications-digest` (hourly) and
+//!    `notifications-retention` (daily), registered with a System Valence.
+//!
+//! The host's [`ContactVerification`] also returns the verified email address
+//! through `verified_email`, answering for the delivery actor
+//! ([`delivery_actor`]) and System. People verify a phone with
+//! [`start_phone_verification`] and [`confirm_phone_verification`]. See
+//! [`mod@delivery`] for routing, [`mod@digest`] and [`mod@retention`] for the
+//! jobs.
+//!
+//! ```rust,no_run
+//! # fn demo(mail: std::sync::Arc<dyn uf_notifications_core::NotificationChannel>) {
+//! use uf_notifications_core::NotificationChannels;
+//!
+//! let builder = NotificationChannels::install(
+//!     valence::Valence::builder(),
+//!     NotificationChannels::new().with(mail),
+//! );
+//! # let _ = builder;
+//! # }
+//! ```
+//!
 //! ## Examples
 //!
 //! Start with [Send notification](#send-notification). Unit tests in this crate cover relative
@@ -193,11 +235,18 @@
 //! call `send_notification` then exercise the bell and inbox.
 
 pub mod audience;
+pub mod channels;
 pub mod create_policy;
+pub mod delivery;
+pub mod delivery_policy;
+pub mod digest;
 pub mod embedded_surreal;
 pub mod events;
 pub mod generated;
 pub mod kinds;
+pub mod phone;
+pub mod retention;
+pub mod routing;
 
 mod dto;
 mod schemas;
@@ -205,9 +254,14 @@ mod send;
 mod url;
 
 pub use audience::{register_notification_audience, NotificationAudienceCheck};
+pub use channels::{channel_configured, ChannelKind, NotificationChannel, NotificationChannels};
 pub use create_policy::{ScopedNotificationCreate, SCOPED_NOTIFICATION_CREATE};
+pub use delivery::register_delivery_scheduler;
+pub use delivery_policy::{delivery_actor, NOTIFICATION_DELIVERY};
 pub use dto::{notification_to_dto, NotificationDto};
-pub use generated::{Notification, NotificationPreference, NotificationSettings};
+pub use generated::{
+    Notification, NotificationContact, NotificationPreference, NotificationSettings,
+};
 /// Re-exported so senders can register kinds with
 /// `uf_notifications_core::inventory::submit!`.
 pub use inventory;
@@ -217,5 +271,6 @@ pub use kinds::{
     Channel, Channels, ContactVerification, Digest, NotificationKind, PreferenceError, Settings,
     MAX_TIME_ZONE_CHARS,
 };
+pub use phone::{confirm_phone_verification, start_phone_verification, PhoneVerificationError};
 pub use send::{send_notification, SendNotification, SendNotificationError};
 pub use url::{is_safe_notification_path, sanitize_notification_url};

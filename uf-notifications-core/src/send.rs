@@ -207,6 +207,9 @@ pub async fn send_notification(
         Utc::now(),
         sender_for(valence.actor()),
         params.subject,
+        None,
+        None,
+        None,
     )
     .map_err(SendNotificationError::Construct)?;
 
@@ -246,6 +249,8 @@ pub async fn send_notification(
                 );
             }
         }
+
+        crate::delivery::enqueue_delivery(valence, &id).await;
 
         Ok(dto)
     }

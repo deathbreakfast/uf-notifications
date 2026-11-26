@@ -14,6 +14,7 @@
 //! schema file for field-level semantics.
 
 use crate::create_policy::SCOPED_NOTIFICATION_CREATE;
+use crate::delivery_policy::NOTIFICATION_DELIVERY;
 use valence::privacy_policies::common::{AUTHENTICATED, PUBLIC_READ, SYSTEM_ONLY};
 use valence::privacy_policies::owner::{OWNER_BY_ID, OWNER_BY_USER_FIELD};
 

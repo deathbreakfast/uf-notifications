@@ -3,19 +3,23 @@ use valence::privacy_policies::common::SYSTEM_ONLY;
 use valence::privacy_policies::owner::OWNER_BY_USER_FIELD;
 
 use crate::create_policy::SCOPED_NOTIFICATION_CREATE;
+use crate::delivery_policy::NOTIFICATION_DELIVERY;
 
 valence_schema! {
     Notification {
         repository: "https://github.com/unified-field-dev/uf-notifications",
         table: "notification",
-        version: "0.5.0",
+        version: "0.6.0",
         database: crate::embedded_surreal::DEFAULT_STORAGE,
         description: "User notification for inbox and bell",
 
         privacy: { gdpr_compliant: false },
 
         policies: {
-            read:   { allow: [OWNER_BY_USER_FIELD] },
+            // SYSTEM_ONLY lets the digest and retention jobs (started as System
+            // by the host) read their rows. NOTIFICATION_DELIVERY is the
+            // `svc:notifications` service actor that delivers email and text.
+            read:   { allow: [OWNER_BY_USER_FIELD, SYSTEM_ONLY, NOTIFICATION_DELIVERY] },
             // SYSTEM_ONLY for jobs/seeds. SCOPED_NOTIFICATION_CREATE lets product
             // side effects mint under the session actor without System elevation:
             // sender is the actor, the actor can read `subject`, and the recipient
@@ -24,7 +28,9 @@ valence_schema! {
             // optional in the schema (System rows have none); the policy
             // requires it for every non-System create.
             create: { allow: [SYSTEM_ONLY, SCOPED_NOTIFICATION_CREATE] },
-            update: { allow: [OWNER_BY_USER_FIELD] },
+            // The delivery actor records `email_sent_at`, `text_sent_at` and
+            // `delivery_error`.
+            update: { allow: [OWNER_BY_USER_FIELD, NOTIFICATION_DELIVERY] },
             delete: { allow: [SYSTEM_ONLY] },
         },
 
@@ -71,6 +77,19 @@ valence_schema! {
                 required: false,
             },
             subject: {
+                r#type: FieldType::String,
+                required: false,
+            },
+            email_sent_at: {
+                r#type: FieldType::Datetime,
+                required: false,
+            },
+            text_sent_at: {
+                r#type: FieldType::Datetime,
+                required: false,
+            },
+            // Last email or text failure, cleared on the next success.
+            delivery_error: {
                 r#type: FieldType::String,
                 required: false,
             }

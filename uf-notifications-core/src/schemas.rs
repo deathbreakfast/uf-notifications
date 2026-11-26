@@ -5,5 +5,7 @@
 //! and panic in [`valence::SchemaRegistry`].
 //!
 //! Schemas in `schemas/`: `Notification`, `NotificationPreference` (one row per kind a
-//! person changed) and `NotificationSettings` (one row per person). The two
-//! preference tables are owner-only and cascade-delete with the user.
+//! person changed), `NotificationSettings` (one row per person) and
+//! `NotificationContact` (a verified phone and any pending code, one row per
+//! person). The last three are owner-written, readable by System jobs and the
+//! delivery service actor, and cascade-delete with the user.

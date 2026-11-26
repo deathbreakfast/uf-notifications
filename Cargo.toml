@@ -113,6 +113,18 @@ photon = { package = "uf-photon", git = "https://github.com/unified-field-dev/ph
 photon-leptos = { git = "https://github.com/unified-field-dev/photon-leptos", branch = "main", default-features = false }
 photon-axum = { git = "https://github.com/unified-field-dev/photon-leptos", branch = "main", default-features = false }
 
+# Boson / Chronon (delivery tasks, digest and retention scripts)
+boson-core = { git = "https://github.com/unified-field-dev/boson", branch = "main" }
+boson-macros = { git = "https://github.com/unified-field-dev/boson", branch = "main" }
+boson-runtime = { git = "https://github.com/unified-field-dev/boson", branch = "main", default-features = false }
+boson-valence-identity = { git = "https://github.com/unified-field-dev/boson-valence-identity", branch = "main" }
+quark = { package = "uf-quark", git = "https://github.com/unified-field-dev/quark", branch = "main" }
+chronon-core = { git = "https://github.com/unified-field-dev/chronon", branch = "main" }
+chronon-executor = { git = "https://github.com/unified-field-dev/chronon", branch = "main" }
+chronon-coordinator = { git = "https://github.com/unified-field-dev/chronon-coordinator", branch = "main" }
+chronon-coordinator-macros = { git = "https://github.com/unified-field-dev/chronon-coordinator-macros", branch = "main" }
+chronon-valence-identity = { git = "https://github.com/unified-field-dev/chronon-valence-identity", branch = "main" }
+
 # In-repo (domain: core + api; UI lives in unified-field-product)
 uf-notifications-core = { path = "uf-notifications-core" }
 uf-notifications-api = { path = "uf-notifications-api", default-features = false }

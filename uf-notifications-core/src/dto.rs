@@ -71,6 +71,9 @@ pub(crate) fn format_relative_time(dt: &DateTime<Utc>) -> String {
 ///     Utc::now(),
 ///     None,
 ///     None,
+///     None,
+///     None,
+///     None,
 /// )
 /// .expect("valid notification");
 ///
@@ -139,6 +142,9 @@ mod tests {
             created,
             None,
             None,
+            None,
+            None,
+            None,
         )
         .expect("Notification::new");
 
@@ -168,6 +174,9 @@ mod tests {
             Utc::now(),
             None,
             None,
+            None,
+            None,
+            None,
         )
         .expect("Notification::new");
 
@@ -194,6 +203,9 @@ mod tests {
                 Utc::now(),
                 None,
                 None,
+                None,
+                None,
+                None,
             )
             .expect("Notification::new");
             let dto = notification_to_dto(&notification);
@@ -215,6 +227,9 @@ mod tests {
             None,
             Some(read_at),
             created,
+            None,
+            None,
+            None,
             None,
             None,
         )
