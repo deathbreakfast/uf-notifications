@@ -341,7 +341,7 @@ async fn channel_failure_is_recorded_then_cleared_on_retry() {
     let stored = row(&lab.system, &id).await.unwrap();
     assert_eq!(
         stored.delivery_error().map(String::as_str),
-        Some("email: provider unavailable")
+        Some("email failed")
     );
     assert!(stored.email_sent_at().is_none());
 

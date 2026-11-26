@@ -246,6 +246,7 @@ pub mod generated;
 pub mod kinds;
 pub mod phone;
 pub mod retention;
+pub mod routing;
 
 mod dto;
 mod schemas;

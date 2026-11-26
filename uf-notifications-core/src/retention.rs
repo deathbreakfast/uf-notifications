@@ -23,6 +23,9 @@ async fn delete_rows(valence: &Valence, rows: Vec<Notification>) -> valence::Res
     let mut deleted = 0;
     for row in rows {
         let Some(id) = row.id() else { continue };
+        // Immediate delete, not a queued run: these rows are already past their
+        // retention window, have no rows that depend on them, and the job
+        // deletes in bounded batches.
         Notification::delete_now(id.id(), valence, valence::use_!(r"When the **notification retention** job runs each day, we **delete Notification** rows read more than 90 days ago or unread for more than a year, so old notifications don't pile up. Only the retention job deletes them this way.")).await?;
         deleted += 1;
     }

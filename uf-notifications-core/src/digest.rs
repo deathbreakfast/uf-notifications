@@ -16,9 +16,9 @@ use chrono::{DateTime, Datelike, Duration, Timelike, Utc, Weekday};
 use valence::{DateTimePredicate, RecordId, RecordPredicate, SortDirection, Valence};
 
 use crate::channels::{ChannelKind, NotificationChannels, OutgoingNotification, DIGEST_KIND_ID};
-use crate::delivery::settings_tz;
 use crate::generated::{NotificationSettings, NotificationSettingsDigest};
 use crate::kinds::{effective_channels, verified_contact, Digest, Settings};
+use crate::routing::settings_tz;
 use crate::Notification;
 
 /// Local hour the digest goes out.

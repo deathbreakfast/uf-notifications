@@ -133,6 +133,8 @@ pub(crate) async fn verified_phone(
     }))
 }
 
+// Mirrors `NotificationContact::new` (one argument per column) so the three
+// call sites read as named rows.
 #[allow(clippy::too_many_arguments)]
 fn contact_row(
     user: &RecordId,
