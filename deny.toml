@@ -7,6 +7,7 @@ ignore = [
     { id = "RUSTSEC-2024-0436", reason = "paste unmaintained; transitive via leptos (either_of)" },
     { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2 unmaintained; transitive via leptos_macro" },
     { id = "RUSTSEC-2026-0459", reason = "libsqlite3-sys 0.30 via sqlx-sqlite; temporary until the fleet sqlx bump moves it to >=0.39" },
+    { id = "RUSTSEC-2026-0555", reason = "chrono-tz unmaintained, no fixed release; direct (quiet hours and digest time zones) and transitive via chronon-scheduler; temporary until the fleet moves to jiff (security:RUSTSEC-2026-0555)" },
     { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained, no fixed release; transitive via lepton-identity, photon and orbital-paging; temporary until the fleet moves to jiff or time (security:RUSTSEC-2026-0543)" },
 ]
 
@@ -44,6 +45,12 @@ highlight = "all"
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-git = [
+    "https://github.com/unified-field-dev/boson",
+    "https://github.com/unified-field-dev/boson-valence-identity",
+    "https://github.com/unified-field-dev/chronon",
+    "https://github.com/unified-field-dev/chronon-coordinator",
+    "https://github.com/unified-field-dev/chronon-coordinator-macros",
+    "https://github.com/unified-field-dev/chronon-valence-identity",
     "https://github.com/unified-field-dev/higgs",
     "https://github.com/unified-field-dev/lepton",
     "https://github.com/unified-field-dev/orbital",

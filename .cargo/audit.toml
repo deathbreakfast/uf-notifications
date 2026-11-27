@@ -9,4 +9,7 @@ ignore = [
     # chrono unmaintained, no fixed release; temporary until the fleet moves
     # to jiff or time (security:RUSTSEC-2026-0543).
     "RUSTSEC-2026-0543",
+    # chrono-tz unmaintained, no fixed release; direct and via
+    # chronon-scheduler (security:RUSTSEC-2026-0555).
+    "RUSTSEC-2026-0555",
 ]
