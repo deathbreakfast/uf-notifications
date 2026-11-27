@@ -47,16 +47,20 @@ project mishandles them in a security-relevant way.
   the policy enforces it. Then, for a row with a `subject` (`table:id`), both
   checks must pass:
   1. The actor can read `subject` under its own privacy.
-  2. The recipient is in the subject's audience, answered by the check the host
-     registered with `register_notification_audience(table, kind, check)`. With
-     no check registered for that table, only a notification to the actor
+  2. The recipient is in the subject's audience, answered by the check
+     registered for the subject's table (and optionally the notification kind).
+     With no check registered for that table, only a notification to the actor
      itself is allowed; every other recipient is refused.
 - **Audience checks** answer yes or no for one recipient. They run with the
   caller's Valence, must not elevate to System, and must never return or log
-  the audience list. An error from a check denies the create. The registry is
-  process-wide; hosts fill it at boot. A later registration for the same table
-  and kind replaces the earlier one and logs a `warn`, so any crate in the host
-  can still swap another product's check until the registry moves into Valence.
+  the audience list. An error from a check denies the create. The policy reads
+  checks from the `NotificationAudiences` registry installed on the acting
+  Valence as an extension (`NotificationAudiences::install`), so a host decides
+  which registry applies when it builds Valence. When the host installed none,
+  the policy uses the default registry that
+  `register_notification_audience(table, kind, check)` fills. A later
+  registration for the same table and kind replaces the earlier one and logs a
+  `warn`.
 - **No subject:** a non-System row without a `subject` is allowed only when
   the recipient is the actor (a note to yourself). Any other recipient is
   refused.

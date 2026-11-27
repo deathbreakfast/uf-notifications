@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use chrono::Utc;
 use lepton_identity::generated::{User, UserStatus, UserUserType};
+use uf_notifications_core::NotificationAudiences;
 use valence::{
     register_backend_logical_names, Actor, DatabaseBackend, DatabaseRouter, Model,
     RegisterBackendLogicalNamesOptions, SqliteBackend, Valence, SQLITE_ENGINE_ID,
@@ -15,6 +16,11 @@ pub const TEST_USER_A: &str = "notify-test-user-a";
 pub const TEST_USER_B: &str = "notify-test-user-b";
 
 pub async fn setup_valence() -> Valence {
+    setup_valence_with(None).await
+}
+
+/// Like [`setup_valence`], with `audiences` installed as the Valence extension.
+pub async fn setup_valence_with(audiences: Option<Arc<NotificationAudiences>>) -> Valence {
     valence::deletion::register_noop_deletion_dispatcher_for_tests();
     valence::clear_for_test();
 
@@ -38,14 +44,18 @@ pub async fn setup_valence() -> Valence {
         RegisterBackendLogicalNamesOptions::default(),
     );
 
-    Valence::builder()
+    let builder = Valence::builder()
         .database_router(Arc::new(router))
         .default_backend_key(valence::router_key("default", SQLITE_ENGINE_ID))
         .with_actor(Actor::System {
             operation: "notify_privacy_test".to_string(),
-        })
-        .build()
-        .expect("build valence")
+        });
+    match audiences {
+        Some(audiences) => audiences.install(builder),
+        None => builder,
+    }
+    .build()
+    .expect("build valence")
 }
 
 pub async fn seed_user(id: &str, valence: &Valence) {
@@ -67,7 +77,12 @@ pub async fn seed_user(id: &str, valence: &Valence) {
 }
 
 pub async fn setup_shared_db() -> Valence {
-    let v = setup_valence().await;
+    setup_shared_db_with(None).await
+}
+
+/// Like [`setup_shared_db`], with `audiences` installed as the Valence extension.
+pub async fn setup_shared_db_with(audiences: Option<Arc<NotificationAudiences>>) -> Valence {
+    let v = setup_valence_with(audiences).await;
     seed_user(TEST_USER_A, &v).await;
     seed_user(TEST_USER_B, &v).await;
     v
