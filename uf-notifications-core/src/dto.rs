@@ -27,6 +27,15 @@ pub struct NotificationDto {
     pub url: Option<String>,
     /// Whether the recipient has marked this notification as read.
     pub is_read: bool,
+    /// The stored kind, for example `magnon.assigned`; `None` when empty.
+    pub kind_id: Option<String>,
+    /// The kind's label from the [kind registry](mod@crate::kinds); `None` for an
+    /// unregistered kind.
+    pub kind_label: Option<String>,
+    /// The sending app's id from the kind registry; `None` for an unregistered kind.
+    pub app_id: Option<String>,
+    /// Whether the kind asks the reader to act; `false` for an unregistered kind.
+    pub asks_action: bool,
 }
 
 pub(crate) fn format_relative_time(dt: &DateTime<Utc>) -> String {
@@ -87,6 +96,8 @@ pub fn notification_to_dto(n: &Notification) -> NotificationDto {
             })
         })
         .unwrap_or_default();
+    let stored_kind = n.kind();
+    let registered = crate::kinds::kind(stored_kind);
 
     NotificationDto {
         notification_id,
@@ -96,6 +107,10 @@ pub fn notification_to_dto(n: &Notification) -> NotificationDto {
         created_at_rfc3339: n.created_at().to_rfc3339(),
         url: sanitize_notification_url(n.url().cloned()),
         is_read: n.read_at().is_some(),
+        kind_id: (!stored_kind.is_empty()).then(|| stored_kind.clone()),
+        kind_label: registered.map(|k| k.label.to_string()),
+        app_id: registered.map(|k| k.app.to_string()),
+        asks_action: registered.is_some_and(|k| k.asks_action),
     }
 }
 
@@ -144,6 +159,10 @@ mod tests {
         let parsed = DateTime::parse_from_rfc3339(&dto.created_at_rfc3339)
             .expect("created_at_rfc3339 parses");
         assert_eq!(parsed.with_timezone(&Utc), created);
+        assert_eq!(dto.kind_id.as_deref(), Some("leaderboard"));
+        assert_eq!(dto.kind_label, None, "unregistered kind has no label");
+        assert_eq!(dto.app_id, None);
+        assert!(!dto.asks_action);
     }
 
     #[test]
@@ -154,7 +173,11 @@ mod tests {
             "message": "Message",
             "created_at": "5m ago",
             "url": null,
-            "is_read": false
+            "is_read": false,
+            "kind_id": null,
+            "kind_label": null,
+            "app_id": null,
+            "asks_action": false
         }"#;
         let dto: NotificationDto = serde_json::from_str(json).expect("older payload");
         assert_eq!(dto.created_at, "5m ago");

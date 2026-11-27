@@ -7,7 +7,7 @@ ignore = [
     { id = "RUSTSEC-2024-0436", reason = "paste unmaintained; transitive via leptos (either_of)" },
     { id = "RUSTSEC-2026-0173", reason = "proc-macro-error2 unmaintained; transitive via leptos_macro" },
     { id = "RUSTSEC-2026-0459", reason = "libsqlite3-sys 0.30 via sqlx-sqlite; temporary until the fleet sqlx bump moves it to >=0.39" },
-    { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained, no fixed release; used directly and via valence/photon/leptos; temporary until the fleet move to jiff or time (security:RUSTSEC-2026-0543)" },
+    { id = "RUSTSEC-2026-0543", reason = "chrono unmaintained, no fixed release; transitive via lepton-identity, photon and orbital-paging; temporary until the fleet moves to jiff or time (security:RUSTSEC-2026-0543)" },
 ]
 
 [licenses]

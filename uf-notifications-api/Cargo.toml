@@ -63,6 +63,8 @@ ssr = [
 chrono = { workspace = true }
 lepton-identity = { workspace = true }
 tokio = { workspace = true }
+# Test subscriber for the cursor-paging rows-read check.
+tracing-core = "0.1"
 uuid = { workspace = true, features = ["v4"] }
 valence = { workspace = true }
 uf-notifications-core = { workspace = true }

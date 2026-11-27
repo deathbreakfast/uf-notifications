@@ -68,6 +68,7 @@ jobs:
         run: |
           cargo test -p uf-notifications-api
           cargo test -p uf-notifications-api --features ssr --lib
+          cargo test -p uf-notifications-api --features ssr --test api_ops_integration
       - name: cargo check + run (notifications-mount-host)
         run: |
           cargo check -p notifications-mount-host

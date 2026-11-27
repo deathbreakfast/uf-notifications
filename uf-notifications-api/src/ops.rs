@@ -4,19 +4,45 @@
 //! [`crate::ssr_support::require_auth_user`], then map [`NotificationOpsError`]
 //! to opaque [`leptos::prelude::ServerFnError`] via
 //! [`crate::ssr_support::map_ops_err`].
+//!
+//! # Paging
+//!
+//! [`unread_page_for_request`] and [`notifications_page_for_request`] order rows
+//! newest first (`created_at`, then `id`, both descending) and take one of two paths:
+//!
+//! - **Cursor**: the request's [`PageRequest::cursor`] decodes for this user, list,
+//!   read filter and search. The read resumes at the raw Valence row the previous
+//!   page stopped at ([`valence::QueryStats::resume`]), so a deep page reads about
+//!   one page of rows instead of every row before it. `offset` is ignored and
+//!   `total_count` is `None`.
+//! - **Offset**: no cursor, or one from another query, user or filter, or a
+//!   garbage token. The read skips `offset` readable rows as before, and the
+//!   first page (`offset == 0`) carries a capped `total_count`.
+//!
+//! A cursor page or first page (`offset == 0`) with more rows after it returns
+//! [`Page::next_cursor`], holding the raw position of the next page's first
+//! row, so a client that sends the cursor back moves onto the cursor path
+//! after page one. A deeper offset page may return none, and the client then
+//! keeps paging by offset. A cursor grants nothing: Valence still applies read
+//! privacy to every row it returns.
+//!
+//! Rows created or marked read between pages shift raw positions the same way
+//! they shift offsets, so a row can repeat or be skipped across pages.
 
 use chrono::{DateTime, Utc};
-use orbital_paging::Page;
+use orbital_paging::{Page, PageCursor, PageRequest};
 use tracing::Instrument;
+use uf_notifications_core::generated::NotificationQuery;
 use uuid::Uuid;
 use valence::{
     DateTimePredicate, Model, RecordId, RecordPredicate, SortDirection, StringPredicate, Valence,
+    MAX_QUERY_OFFSET,
 };
 
 use crate::{
     cap_notification_count, clamp_notification_page_limit, notification_to_dto,
-    truncate_notification_search, NotificationDto, NotificationModel, NotificationReadFilter,
-    MAX_NOTIFICATION_COUNT_CAP,
+    truncate_notification_search, NotificationDto, NotificationInboxFilter, NotificationModel,
+    NotificationReadFilter, MAX_NOTIFICATION_COUNT_CAP,
 };
 
 /// Typed failure from Valence-backed notification ops (before the Leptos boundary).
@@ -71,6 +97,109 @@ fn read_filter_label(filter: NotificationReadFilter) -> &'static str {
         NotificationReadFilter::All => "all",
         NotificationReadFilter::Unread => "unread",
         NotificationReadFilter::Read => "read",
+    }
+}
+
+/// Fingerprint scope for one list: a cursor issued for another list, user,
+/// read filter or search term decodes to `None`.
+fn cursor_scope(list: &str, user_id: &RecordId, search: Option<&str>) -> String {
+    serde_json::to_string(&(list, user_id.to_string(), search)).unwrap_or_default()
+}
+
+/// One page from [`read_page`].
+struct PageRead {
+    page: Page<NotificationDto>,
+    /// `true` when the request's cursor decoded and the read resumed from it.
+    by_cursor: bool,
+    /// Raw backend rows read, before privacy filters (telemetry only).
+    rows_read: usize,
+}
+
+/// Read one page of `query` newest first: from the request's cursor when it
+/// decodes for `scope`, otherwise from `request.offset`.
+///
+/// Reads `limit + 1` rows to learn whether more follow. The next page must
+/// start at that extra row. When every raw row read was returned or skipped,
+/// the extra row sits at `start + skip + limit`. Otherwise rows Valence hid
+/// lie in between: a read that skipped nothing (a cursor page or the first
+/// page) reads `limit` rows again to learn exactly where the page ends, and a
+/// deeper offset read returns no cursor.
+async fn read_page(
+    query: NotificationQuery<'_>,
+    request: &PageRequest,
+    scope: &str,
+    limit: u32,
+) -> Result<PageRead, NotificationOpsError> {
+    let query = query
+        .order_by_created_at(SortDirection::Desc)
+        .order_by_id(SortDirection::Desc);
+    let resume_from =
+        PageCursor::from_request(request, scope).and_then(|c| u32::try_from(c.position).ok());
+    let (start, skip, windowed) = match resume_from {
+        Some(at) => {
+            let mut q = query;
+            q.inner = q.inner.resume_at(at);
+            (at, 0, q)
+        }
+        None => {
+            let offset = request.offset.min(MAX_QUERY_OFFSET);
+            (0, offset, query.offset(offset))
+        }
+    };
+
+    let (mut rows, stats) = windowed
+        .clone()
+        .limit(limit + 1)
+        .fetch_with_stats()
+        .await
+        .map_err(store_err)?;
+    let mut rows_read = stats.fetched;
+    let page_len = limit as usize;
+
+    let next_at = if rows.len() > page_len {
+        if stats.fetched == skip as usize + page_len + 1 {
+            start.checked_add(skip).and_then(|p| p.checked_add(limit))
+        } else if skip > 0 {
+            // A second offset read would re-read every row before the page
+            // again; the client keeps paging by offset instead.
+            None
+        } else {
+            let (_, exact) = windowed
+                .limit(limit)
+                .fetch_with_stats()
+                .await
+                .map_err(store_err)?;
+            rows_read += exact.fetched;
+            exact.resume
+        }
+    } else {
+        // A short page that still resumes stopped at Valence's hidden-row budget.
+        stats.resume
+    };
+
+    let has_more = rows.len() > page_len || next_at.is_some();
+    rows.truncate(page_len);
+    let next_cursor =
+        next_at.map(|at| PageCursor::new(u64::from(at), request.query_fingerprint(scope)).encode());
+    let page = Page {
+        items: rows.iter().map(notification_to_dto).collect(),
+        has_more,
+        ..Page::default()
+    }
+    .with_next_cursor(next_cursor);
+
+    Ok(PageRead {
+        page,
+        by_cursor: resume_from.is_some(),
+        rows_read,
+    })
+}
+
+fn path_label(by_cursor: bool) -> &'static str {
+    if by_cursor {
+        "cursor"
+    } else {
+        "offset"
     }
 }
 
@@ -133,7 +262,9 @@ pub async fn unread_preview_for_user(
     .await
 }
 
-/// Paged unread rows for bell infinite scroll.
+/// Paged unread rows for bell infinite scroll, by offset.
+///
+/// Same as [`unread_page_for_request`] with `PageRequest::new(offset, limit)`.
 ///
 /// # Errors
 ///
@@ -144,19 +275,37 @@ pub async fn unread_page_for_user(
     offset: u32,
     limit: u32,
 ) -> Result<Page<NotificationDto>, NotificationOpsError> {
-    let limit = clamp_notification_page_limit(limit);
+    unread_page_for_request(valence, user_id, &PageRequest::new(offset, limit)).await
+}
+
+/// Paged unread rows for bell infinite scroll, newest first.
+///
+/// Resumes from `request.cursor` when it came from this user's unread list
+/// with the same `limit`, so a deep page reads about one page of rows.
+/// Otherwise (no cursor, or a stale, foreign or garbage one) it reads from
+/// `request.offset`. Returns `next_cursor` on cursor pages and the first page
+/// when more rows follow. The first offset page carries a capped
+/// `total_count`; cursor pages carry none.
+///
+/// # Errors
+///
+/// Returns [`NotificationOpsError::Store`] on Valence errors.
+pub async fn unread_page_for_request(
+    valence: &Valence,
+    user_id: RecordId,
+    request: &PageRequest,
+) -> Result<Page<NotificationDto>, NotificationOpsError> {
+    let limit = clamp_notification_page_limit(request.limit);
+    let offset = request.offset;
+    let scope = cursor_scope("unread", &user_id, None);
 
     async {
-        let notifications: Vec<NotificationModel> = NotificationModel::query(valence, valence::use_!(r"In **notifications**, we **list Notification Model** so the product can show or process the matching set for this workflow. Callers allowed for **notifications** use the list; it is not a public dump of every field to anonymous visitors."))
+        let query = NotificationModel::query(valence, valence::use_!(r"In **notifications**, we **list Notification Model** so the product can show or process the matching set for this workflow. Callers allowed for **notifications** use the list; it is not a public dump of every field to anonymous visitors."))
             .where_user(RecordPredicate::Equals(user_id.clone()))
-            .where_read_at_is_none()
-            .order_by_created_at(SortDirection::Desc)
-            .limit(limit + 1)
-            .offset(offset)
-            .await
-            .map_err(store_err)?;
+            .where_read_at_is_none();
+        let read = read_page(query, request, &scope, limit).await?;
 
-        let total_count: Option<u64> = if offset == 0 {
+        let total_count: Option<u64> = if !read.by_cursor && offset == 0 {
             let all_unread: Vec<NotificationModel> = NotificationModel::query(valence, valence::use_!(r"In **notifications**, we **list Notification Model** so the product can show or process the matching set for this workflow. Callers allowed for **notifications** use the list; it is not a public dump of every field to anonymous visitors."))
                 .where_user(RecordPredicate::Equals(user_id))
                 .where_read_at_is_none()
@@ -168,15 +317,22 @@ pub async fn unread_page_for_user(
             None
         };
 
-        let dtos: Vec<NotificationDto> = notifications.iter().map(notification_to_dto).collect();
-        tracing::Span::current().record("result_len", dtos.len());
-        Ok(Page::from_oversized(dtos, limit, total_count))
+        let span = tracing::Span::current();
+        span.record("result_len", read.page.items.len());
+        span.record("path", path_label(read.by_cursor));
+        span.record("rows_read", read.rows_read);
+        Ok(Page {
+            total_count,
+            ..read.page
+        })
     }
     .instrument(tracing::info_span!(
         "uf_notifications.unread_page",
         operation = "unread_page",
         offset,
         limit,
+        path = tracing::field::Empty,
+        rows_read = tracing::field::Empty,
         result_len = tracing::field::Empty,
     ))
     .await
@@ -274,7 +430,9 @@ pub async fn notification_count_for_user(
     .await
 }
 
-/// Inbox page with search + read filter.
+/// Inbox page with search + read filter, by offset.
+///
+/// Same as [`notifications_page_for_request`] with `PageRequest::new(offset, limit)`.
 ///
 /// # Errors
 ///
@@ -287,15 +445,95 @@ pub async fn notifications_page_for_user(
     query: Option<String>,
     read_filter: NotificationReadFilter,
 ) -> Result<Page<NotificationDto>, NotificationOpsError> {
-    let limit = clamp_notification_page_limit(limit);
+    notifications_page_for_request(
+        valence,
+        user_id,
+        &PageRequest::new(offset, limit),
+        query,
+        read_filter,
+    )
+    .await
+}
+
+/// Inbox page with search + read filter, newest first.
+///
+/// Resumes from `request.cursor` when it came from this user's inbox with the
+/// same read filter, search and `limit`, so a deep page reads about one page
+/// of rows. Otherwise (no cursor, or a stale, foreign or garbage one) it reads
+/// from `request.offset`. Returns `next_cursor` on cursor pages and the first
+/// page when more rows follow. The first offset page carries a capped
+/// `total_count`; cursor pages carry none.
+///
+/// # Errors
+///
+/// Returns [`NotificationOpsError::Store`] on Valence errors.
+pub async fn notifications_page_for_request(
+    valence: &Valence,
+    user_id: RecordId,
+    request: &PageRequest,
+    query: Option<String>,
+    read_filter: NotificationReadFilter,
+) -> Result<Page<NotificationDto>, NotificationOpsError> {
+    inbox_page_for_request(
+        valence,
+        user_id,
+        request,
+        query,
+        read_filter,
+        &NotificationInboxFilter::default(),
+    )
+    .await
+}
+
+/// Registered kind ids `filter` admits, or `None` when it admits every kind.
+fn inbox_kind_ids(filter: &NotificationInboxFilter) -> Option<Vec<&'static str>> {
+    filter.is_active().then(|| {
+        uf_notifications_core::kinds()
+            .into_iter()
+            .filter(|k| !filter.asks_action || k.asks_action)
+            .filter(|k| filter.app_id.as_deref().is_none_or(|app| k.app == app))
+            .map(|k| k.id)
+            .collect()
+    })
+}
+
+/// [`notifications_page_for_request`] narrowed by an inbox filter.
+///
+/// `filter.asks_action` keeps kinds that ask the reader to act and
+/// `filter.app_id` keeps one app's kinds, both from the kind registry, so
+/// unregistered kinds never match an active filter. A filter no registered
+/// kind matches returns an empty page. Cursors carry the filter, so one issued
+/// under another filter falls back to `offset`.
+///
+/// # Errors
+///
+/// Returns [`NotificationOpsError::Store`] on Valence errors.
+pub async fn inbox_page_for_request(
+    valence: &Valence,
+    user_id: RecordId,
+    request: &PageRequest,
+    query: Option<String>,
+    read_filter: NotificationReadFilter,
+    inbox_filter: &NotificationInboxFilter,
+) -> Result<Page<NotificationDto>, NotificationOpsError> {
+    let limit = clamp_notification_page_limit(request.limit);
+    let offset = request.offset;
     let filter = read_filter_label(read_filter);
     let search_term = query
         .as_deref()
         .map(truncate_notification_search)
         .filter(|s| !s.is_empty());
     let has_query = search_term.is_some();
+    let list = if inbox_filter.is_active() {
+        serde_json::to_string(&(filter, inbox_filter)).unwrap_or_default()
+    } else {
+        filter.to_string()
+    };
+    let scope = cursor_scope(&list, &user_id, search_term.as_deref());
+    let kind_ids = inbox_kind_ids(inbox_filter);
 
-    async {
+    // Boxed: the filter and union branches make this future large for callers.
+    Box::pin(async {
         let base = {
             let mut q = NotificationModel::query(valence, valence::use_!(r"In **notifications**, we **list Notification Model** so the product can show or process the matching set for this workflow. Callers allowed for **notifications** use the list; it is not a public dump of every field to anonymous visitors."))
                 .where_user(RecordPredicate::Equals(user_id.clone()));
@@ -307,27 +545,41 @@ pub async fn notifications_page_for_user(
             q
         };
 
-        let filtered = if let Some(ref term) = search_term {
-            let by_title = base
-                .clone()
-                .where_title(StringPredicate::Contains(term.clone()));
-            let by_message = base
-                .clone()
-                .where_message(StringPredicate::Contains(term.clone()));
-            by_title.union(by_message)
-        } else {
-            base.clone()
+        let by_kind: Vec<NotificationQuery<'_>> = match &kind_ids {
+            None => vec![base],
+            Some(ids) => ids
+                .iter()
+                .map(|id| {
+                    base.clone()
+                        .where_kind(StringPredicate::Equals((*id).to_string()))
+                })
+                .collect(),
+        };
+        let branches: Vec<NotificationQuery<'_>> = match search_term {
+            Some(ref term) => by_kind
+                .into_iter()
+                .flat_map(|q| {
+                    [
+                        q.clone()
+                            .where_title(StringPredicate::Contains(term.clone())),
+                        q.where_message(StringPredicate::Contains(term.clone())),
+                    ]
+                })
+                .collect(),
+            None => by_kind,
+        };
+        let Some(filtered) = branches.into_iter().reduce(NotificationQuery::union) else {
+            // An active filter that no registered kind matches.
+            tracing::Span::current().record("result_len", 0);
+            return Ok(Page {
+                total_count: (offset == 0).then_some(0),
+                ..Page::default()
+            });
         };
 
-        let notifications: Vec<NotificationModel> = filtered
-            .clone()
-            .order_by_created_at(SortDirection::Desc)
-            .limit(limit + 1)
-            .offset(offset)
-            .await
-            .map_err(store_err)?;
+        let read = read_page(filtered.clone(), request, &scope, limit).await?;
 
-        let total_count: Option<u64> = if offset == 0 {
+        let total_count: Option<u64> = if !read.by_cursor && offset == 0 {
             let all: Vec<NotificationModel> = filtered
                 .limit(MAX_NOTIFICATION_COUNT_CAP)
                 .await
@@ -337,9 +589,14 @@ pub async fn notifications_page_for_user(
             None
         };
 
-        let dtos: Vec<NotificationDto> = notifications.iter().map(notification_to_dto).collect();
-        tracing::Span::current().record("result_len", dtos.len());
-        Ok(Page::from_oversized(dtos, limit, total_count))
+        let span = tracing::Span::current();
+        span.record("result_len", read.page.items.len());
+        span.record("path", path_label(read.by_cursor));
+        span.record("rows_read", read.rows_read);
+        Ok(Page {
+            total_count,
+            ..read.page
+        })
     }
     .instrument(tracing::info_span!(
         "uf_notifications.page",
@@ -348,8 +605,11 @@ pub async fn notifications_page_for_user(
         limit,
         filter,
         has_query,
+        inbox_filter = inbox_filter.is_active(),
+        path = tracing::field::Empty,
+        rows_read = tracing::field::Empty,
         result_len = tracing::field::Empty,
-    ))
+    )))
     .await
 }
 
