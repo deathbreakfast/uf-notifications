@@ -272,7 +272,7 @@ mod tests {
 }
 
 #[cfg(all(test, not(feature = "ssr")))]
-mod tests {
+mod created_at_rfc3339_tests {
     use super::NotificationDto;
 
     #[test]
